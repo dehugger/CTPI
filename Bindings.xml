@@ -1,0 +1,8 @@
+<Bindings>
+    <Binding name="CTPI_TOGGLE" category="ADDONS" header="CTPI">
+        CTPI_ToggleMaster();
+    </Binding>
+    <Binding name="CTPI_FREECURSOR" category="ADDONS">
+        CTPI_ToggleFreeCursor();
+    </Binding>
+</Bindings>

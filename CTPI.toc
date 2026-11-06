@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: |cFFc8a25eCoffee's Touchpad Improvements|r
+## Notes: Always-on mouselook, reticle targeting, and touchpad-friendly click/run for WoW Forever.
+## Author: coffeeofdoom
+## Version: 2.1.0
+## SavedVariables: CTPIDB
+## X-License: MIT
+## X-Website: https://github.com/dehugger/CTPI
+
+Compat.lua
+Core.lua
+Secure.lua
+Camera.lua
+Look.lua
+HUD.lua
+Dialog.lua
+UI.lua
