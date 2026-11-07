@@ -25,6 +25,9 @@ Author: **coffeeofdoom**
 - **Configurable mouse buttons.** Left and right click can each be Interact,
   Hold to run, Autorun or nothing. While you're autorunning, left-click (when
   it's on Interact) cancels the autorun.
+- **Click to lock (great for ranged).** Optionally, left-clicking an enemy
+  locks it as your hard target, or locks it and starts attacking (Auto Shot
+  on hunters), so your target stays put while you look around.
 - **Look-at label.** A short label under the aim point with the name of what
   you're looking at, colored by type (red enemy, green friendly, gold
   interactable), plus icons for what clicking will do and your target-lock
@@ -48,11 +51,18 @@ Author: **coffeeofdoom**
 
 ## Install
 
-1. Download this repo (Code > Download ZIP) or clone it.
-2. Put the folder in `World of Warcraft/_forever_/Interface/AddOns/` and make
-   sure it's named exactly **`CTPI`** (so the path ends in `AddOns/CTPI/CTPI.toc`).
+1. Download **`CTPI-<version>.zip`** from the
+   [latest release](https://github.com/dehugger/CTPI/releases/latest).
+2. Unzip it into `World of Warcraft/_forever_/Interface/AddOns/`. The zip
+   already contains a folder named `CTPI`, so you end up with
+   `AddOns/CTPI/CTPI.toc`.
 3. Fully restart the game (a `/reload` doesn't pick up a newly added addon).
 4. Type `/ctpi` to open the settings.
+
+> **Don't use the green Code > Download ZIP button.** GitHub names that
+> folder `CTPI-main`, and WoW needs the folder to be named exactly `CTPI`
+> (the wrong name can even stop the launcher from starting the game). If you
+> already did, rename the folder to `CTPI`.
 
 ---
 
@@ -74,6 +84,7 @@ Author: **coffeeofdoom**
 |---|---|
 | Move fingers | Turn the camera |
 | Left click | Interact with what you're looking at (attack / talk / loot / use) |
+| Left click on an enemy (optional) | Lock it as your target, or lock + attack |
 | Left click while autorunning | Stop autorunning (out of combat) |
 | Right click | Toggle autorun |
 | Shift-Tab | Lock the looked-at enemy as your target |
@@ -99,8 +110,8 @@ The settings window has five tabs and previews changes live while it's open.
   resource arc (side, radius, hide when idle), combo points (inner ring, row
   above, off), arc group offset and ring gap.
 - **Camera:** shoulder camera mode and offset, switch shoulder.
-- **Behavior:** left/right click actions, left-click stops autorun, look to
-  target toggles, cursor unlock on focus loss, quest/gossip keys, debug
+- **Behavior:** left/right click actions, left-click on enemies (interact /
+  lock / lock + attack), left-click stops autorun, look to target toggles, cursor unlock on focus loss, quest/gossip keys, debug
   messages.
 
 ---
@@ -112,6 +123,7 @@ The settings window has five tabs and previews changes live while it's open.
 /ctpi toggle                master on/off
 /ctpi left <interact|run|autorun|none>
 /ctpi right <interact|run|autorun|none>
+/ctpi leftenemy <interact|lock|lockattack>   what left-click does to enemies
 /ctpi softenemy             toggle look-to-target enemies
 /ctpi softfriend            toggle look-to-heal friendlies
 /ctpi softinteract          toggle look-to-interact (npcs, nodes, mailboxes)
@@ -159,7 +171,8 @@ The settings window has five tabs and previews changes live while it's open.
 ## Status
 
 Tested in game on Forever: loading, mouselook and cursor freeing, the settings
-window, the HUD arcs and combo ring, and hold-to-run on the mouse buttons.
+window, the HUD arcs and combo ring, hold-to-run on the mouse buttons, and
+left-click lock + attack.
 
 Not yet confirmed in game: quest/gossip keys, the shoulder camera, the
 autorun cancel, the click hint icons, and behavior with secret values in

@@ -481,6 +481,7 @@ local defaults = {
   -- to run) | TOGGLEAUTORUN (tap to run) | "" (nothing). see Secure.lua
   leftAction   = "INTERACTMOUSEOVER",
   leftStopsAutorun = true,         -- while autorunning, left-click stops it (Secure.lua)
+  leftEnemy    = "interact",       -- left-click on enemies: interact | lock | lockattack
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in
@@ -700,6 +701,17 @@ SlashCmdList["CTPI"] = function(msg)
     ns.RefreshBindings()
     if ns.ApplyNativeClick then ns.ApplyNativeClick() end   -- also when mouselook is off right now
     p(cmd .. "-click = |cFFFFFF00" .. key .. "|r")
+
+  elseif cmd == "leftenemy" then
+    if InCombatLockdown() then p("cant change this in combat"); return end
+    local v = rest:lower()
+    if v ~= "interact" and v ~= "lock" and v ~= "lockattack" then
+      p("usage: /ctpi leftenemy <interact|lock|lockattack>"); return
+    end
+    db.leftEnemy = v
+    if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end
+    ns.RefreshBindings()
+    p("left-click on enemies = |cFFFFFF00" .. v .. "|r")
 
   elseif cmd == "softenemy" or cmd == "softtarget" then
     db.softTargetEnemy = not db.softTargetEnemy

@@ -519,7 +519,22 @@ local function buildBehaviorPage(page)
   leftBtns[1]:SetPoint("TOPLEFT", leftLbl, "BOTTOMLEFT", 0, -6)
   repaints[#repaints+1] = leftRepaint
 
-  local rightLbl = smallLabel(page, "Right-click", leftBtns[1], 0, -10)
+  local enemyLbl = smallLabel(page, "Left-click on enemies (when left is Interact)", leftBtns[1], 0, -10)
+  local enemyBtns, enemyRepaint = makeChoiceRow(page,
+    { { label = "Interact",      value = "interact",   w = 70 },
+      { label = "Lock target",   value = "lock",       w = 92 },
+      { label = "Lock + attack", value = "lockattack", w = 108 } },
+    function() return db.leftEnemy or "interact" end,
+    function(v)
+      if InCombatLockdown() then return end
+      db.leftEnemy = v
+      if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end
+      ns.RefreshBindings()
+    end)
+  enemyBtns[1]:SetPoint("TOPLEFT", enemyLbl, "BOTTOMLEFT", 0, -6)
+  repaints[#repaints+1] = enemyRepaint
+
+  local rightLbl = smallLabel(page, "Right-click", enemyBtns[1], 0, -10)
   local rightBtns, rightRepaint = makeChoiceRow(page, CLICK_CHOICES,
     function() return db.rightAction end,
     function(v) db.rightAction = v; ns.RefreshBindings() end)

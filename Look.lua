@@ -90,7 +90,19 @@ local function clickHint(token)
   local parts = {}
   local btn = ns.InteractButtonLabel and ns.InteractButtonLabel()
   local act = btn and actionFor(token)
-  if act then
+  local enemyMode = token == "softenemy" and ns.EnemyClickMode and ns.EnemyClickMode()
+  if enemyMode then
+    -- left-click locks (and maybe attacks) instead of plain interact
+    local word = (enemyMode == "lockattack") and "Lock + attack" or "Lock"
+    if style == "text" then
+      parts[#parts + 1] = "click: " .. word:lower()
+    else
+      local p = atlas("NPE_LeftClick", s) .. tex(LOCK_ICON, s)
+      if enemyMode == "lockattack" then p = p .. tex(ACTION_ICON.attack, s) end
+      if style == "icons" then p = p .. " " .. word end
+      parts[#parts + 1] = p
+    end
+  elseif act then
     if style == "text" then
       parts[#parts + 1] = btn .. ": " .. act:lower()
     else
@@ -99,7 +111,7 @@ local function clickHint(token)
       parts[#parts + 1] = p
     end
   end
-  if token == "softenemy" and db.lockKey and db.lockKey ~= "" then
+  if token == "softenemy" and not enemyMode and db.lockKey and db.lockKey ~= "" then
     if style == "text" then
       parts[#parts + 1] = db.lockKey:lower() .. ": lock"
     else

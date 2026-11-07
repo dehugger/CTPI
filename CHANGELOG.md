@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0
+
+- **Left-click on enemies** (Behavior tab, `/ctpi leftenemy`): while left is
+  Interact, clicking an enemy can **lock** it as your hard target, or **lock +
+  attack** (hunters start Auto Shot, everyone else starts auto attack). Out of
+  combat it only applies with an enemy under the reticle, so looting and
+  talking still work; in combat left-click stays in enemy mode.
+- The look-at label shows the lock / attack action on enemies.
+
 ## 2.1.0
 
 - **Mouse buttons:** left and right click can each be Interact, Hold to run,

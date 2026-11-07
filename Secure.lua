@@ -52,6 +52,56 @@ local function applyNativeClick()
 end
 ns.ApplyNativeClick = applyNativeClick
 
+-- ---------------------------------------------------------------------
+-- Left-click on enemies (db.leftEnemy): "interact" | "lock" | "lockattack".
+-- Only applies while left-click is Interact. When an enemy is under the
+-- reticle, BUTTON1 is pointed at a secure macro button instead:
+--   lock        /target the looked-at enemy (a hard target, so it stays put)
+--   lockattack  same, then start attacking it (hunters: Auto Shot)
+-- Bindings cant change in combat, so out of combat the swap follows what
+-- you're looking at, and on entering combat left-click goes into enemy mode
+-- for the whole fight (PLAYER_REGEN_DISABLED is the last moment to switch).
+-- ---------------------------------------------------------------------
+local enemyBtn = CreateFrame("Button", "CTPIEnemyClickButton", UIParent, "SecureActionButtonTemplate")
+enemyBtn:RegisterForClicks("AnyUp", "AnyDown")
+enemyBtn:SetAttribute("type", "macro")
+
+local function enemyMacro()
+  local db = ns.db
+  local lock = "/target [@softenemy,harm,nodead] softenemy"
+  if not db or db.leftEnemy ~= "lockattack" then return lock end
+  local _, class = UnitClass("player")
+  if class == "HUNTER" then
+    local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(75))
+      or (GetSpellInfo and GetSpellInfo(75)) or "Auto Shot"
+    if ns.IsSecret(name) then name = "Auto Shot" end
+    return lock .. "\n/cast [@target,harm,nodead] !" .. name
+  end
+  return lock .. "\n/startattack [@target,harm,nodead]"
+end
+
+function ns.UpdateEnemyMacro()
+  if InCombatLockdown() then return end
+  enemyBtn:SetAttribute("macrotext", enemyMacro())
+end
+
+local function lookingAtEnemy()
+  local e = UnitExists("softenemy")
+  if ns.IsSecret(e) or not e then return false end
+  local i = UnitExists("softinteract")
+  if (not ns.IsSecret(i)) and i then return false end   -- an interactable wins (loot, npc)
+  return true
+end
+
+-- "lock" / "lockattack" when left-click is acting on enemies right now, else nil
+function ns.EnemyClickMode()
+  local db = ns.db
+  if not db or db.leftAction ~= "INTERACTMOUSEOVER" or ns.autorunSwap then return nil end
+  local m = db.leftEnemy or "interact"
+  if m == "interact" then return nil end
+  return m
+end
+
 function ns.ApplyClickBindings()
   if InCombatLockdown() then return end
   ClearOverrideBindings(owner)
@@ -60,7 +110,11 @@ function ns.ApplyClickBindings()
   if not db then return end
   local left = db.leftAction
   if ns.autorunSwap then left = "MOVEFORWARD" end   -- left-click cancels autorun (below)
-  if CLICK_ACTIONS[left] then
+  if ns.EnemyClickMode() and (ns.combatEnemyMode or lookingAtEnemy()) then
+    SetOverrideBindingClick(owner, true, "BUTTON1", "CTPIEnemyClickButton")
+    left = nil
+  end
+  if left and CLICK_ACTIONS[left] then
     SetOverrideBinding(owner, true, "BUTTON1", left)
   end
   if CLICK_ACTIONS[db.rightAction] then
@@ -174,7 +228,8 @@ if StopAutoRun   then hooksecurefunc("StopAutoRun",   function() setAuto(false) 
 
 local aev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING",
-                     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+                     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_LOGIN",
+                     "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_SOFT_INTERACT_CHANGED" }) do
   pcall(aev.RegisterEvent, aev, e)
 end
 aev:SetScript("OnEvent", function(self, event)
@@ -188,11 +243,22 @@ aev:SetScript("OnEvent", function(self, event)
   elseif event == "PLAYER_STOPPED_MOVING" then
     setAuto(false)
   elseif event == "PLAYER_REGEN_DISABLED" then
-    if ns.autorunSwap then
-      ns.autorunSwap = false
-      if ns.RefreshBindings then ns.RefreshBindings() end
-    end
+    -- last moment bindings can change: left back to Interact (or enemy mode)
+    local changed = false
+    if ns.autorunSwap then ns.autorunSwap = false; changed = true end
+    if ns.EnemyClickMode() then ns.combatEnemyMode = true; changed = true end
+    if changed and ns.RefreshBindings then ns.RefreshBindings() end
   elseif event == "PLAYER_REGEN_ENABLED" then
+    ns.combatEnemyMode = false
+    if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end
+    if ns.RefreshBindings then ns.RefreshBindings() end
     syncAutorunSwap()
+  elseif event == "PLAYER_LOGIN" then
+    ns.UpdateEnemyMacro()
+  elseif event == "PLAYER_SOFT_ENEMY_CHANGED" or event == "PLAYER_SOFT_INTERACT_CHANGED" then
+    -- out of combat, follow what's under the reticle
+    if ns.EnemyClickMode() and not InCombatLockdown() and IsMouselooking() then
+      ns.ApplyClickBindings()
+    end
   end
 end)
