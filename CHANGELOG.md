@@ -20,6 +20,11 @@
   always get interact, so looting and skinning work without toggling the
   lock off. (A live mob next to a corpse used to win, and the choice could
   stay stuck on "enemy" after a kill.)
+- **Loot in combat with lock mode:** a secure state driver re-points
+  left-click while in combat (corpse / friendly under the reticle: interact;
+  live enemy: lock / attack). Probed at login; falls back to the old
+  behavior if the client's secure snippets don't work. `/ctpi why` shows
+  which one is active.
 - **Interact key** (`/ctpi interactkey <KEY>`): an optional keyboard interact
   that also works in combat, when left-click is in lock mode.
 

@@ -158,15 +158,97 @@ function ns.EnemyClickMode()
   return m
 end
 
+-- ---------------------------------------------------------------------
+-- Secure aim header: lets left-click switch between lock/attack and
+-- interact (loot!) DURING combat.
+-- Addon code can't change bindings in combat, but a secure state driver
+-- can: the game itself re-evaluates the macro condition below (a few times
+-- a second) and runs the restricted snippet, which re-points BUTTON1.
+--   dead / friendly / neutral thing under the reticle -> INTERACTMOUSEOVER
+--   live hostile under the reticle (or near it)         -> lock / attack button
+--   nothing, in combat                                  -> lock / attack button
+--   nothing, out of combat                              -> INTERACTMOUSEOVER
+-- Forever's early builds had broken secure snippets, so this is probed at
+-- login (ns.secureAimOK) and the insecure path below is the fallback.
+-- ---------------------------------------------------------------------
+local AIM_DRIVER = "[@mouseover,dead] interact; [@mouseover,help] interact; "
+  .. "[@mouseover,harm] enemy; [@mouseover,exists] interact; "
+  .. "[@softinteract,exists] interact; [@softenemy,harm,nodead] enemy; "
+  .. "[combat] enemy; interact"
+
+local header = CreateFrame("Frame", "CTPIAimHeader", UIParent, "SecureHandlerStateTemplate")
+header:SetAttribute("apply", [[
+  local st = ...
+  if self:GetAttribute("ctpi-off") then
+    self:ClearBindings()
+  elseif self:GetAttribute("ctpi-autorun") then
+    self:SetBinding(true, "BUTTON1", "MOVEFORWARD")
+  elseif st == "enemy" then
+    self:SetBindingClick(true, "BUTTON1", "CTPIEnemyClickButton")
+  else
+    self:SetBinding(true, "BUTTON1", "INTERACTMOUSEOVER")
+  end
+]])
+header:SetAttribute("_onstate-aim", [[ self:RunAttribute("apply", newstate) ]])
+
+ns.secureAimOK = false
+local driverOn, hOff, hAuto = false, nil, nil
+
+function ns.ProbeSecureAim()
+  if InCombatLockdown() then return end
+  header:SetAttribute("ctpi-probe", nil)
+  local ok = pcall(SecureHandlerExecute, header, [[ self:SetAttribute("ctpi-probe", "ok") ]])
+  ns.secureAimOK = (ok and header:GetAttribute("ctpi-probe") == "ok") and true or false
+  if ns.debug then
+    print("|cFFc8a25eCTPI|r secure aim (loot in combat): " .. (ns.secureAimOK and "working" or "unavailable, using fallback"))
+  end
+end
+
+-- header mode = lock/attack option is on and the secure path works
+local function useHeader()
+  local db = ns.db
+  return ns.secureAimOK and db and db.leftAction == "INTERACTMOUSEOVER"
+    and (db.leftEnemy or "interact") ~= "interact"
+end
+ns.AimHeaderActive = function() return useHeader() and driverOn end
+
+local function headerSync(off, autorun)
+  if InCombatLockdown() then return end
+  local fresh = false
+  if not driverOn then RegisterStateDriver(header, "aim", AIM_DRIVER); driverOn = true; fresh = true end
+  off, autorun = off and true or nil, autorun and true or nil
+  if fresh or off ~= hOff or autorun ~= hAuto then
+    hOff, hAuto = off, autorun
+    header:SetAttribute("ctpi-off", off)
+    header:SetAttribute("ctpi-autorun", autorun)
+    SecureHandlerExecute(header, [[ self:RunAttribute("apply", self:GetAttribute("state-aim")) ]])
+  end
+end
+
+local function headerStop()
+  if InCombatLockdown() or not driverOn then return end
+  UnregisterStateDriver(header, "aim")
+  driverOn, hOff, hAuto = false, nil, nil
+  ClearOverrideBindings(header)
+end
+
 function ns.ApplyClickBindings()
   if InCombatLockdown() then return end
   applyNativeClick()
   local db = ns.db
   if not db then return end
+  if useHeader() then
+    setClick("BUTTON1", nil)                    -- the secure header owns BUTTON1
+    headerSync(false, ns.autorunSwap)
+  else
+    headerStop()
+  end
   if not ns.combatEnemyMode then enemyUnder = wantEnemy() end   -- always a fresh look
   local left = db.leftAction
   if ns.autorunSwap then left = "MOVEFORWARD" end   -- left-click cancels autorun (below)
-  if ns.EnemyClickMode() and (ns.combatEnemyMode or enemyUnder) then
+  if useHeader() then
+    -- handled above
+  elseif ns.EnemyClickMode() and (ns.combatEnemyMode or enemyUnder) then
     setClick("BUTTON1", "C", "CTPIEnemyClickButton")
   elseif left and CLICK_ACTIONS[left] then
     setClick("BUTTON1", "A", left)
@@ -186,7 +268,7 @@ end
 -- splits the press across two actions (down on one, up on the other).
 function ns.TickClickAim()
   if not ns.EnemyClickMode() or InCombatLockdown() or ns.combatEnemyMode
-     or not IsMouselooking() then return end
+     or not IsMouselooking() or useHeader() then return end
   local want = wantEnemy()
   if want == enemyUnder then return end
   if IsMouseButtonDown and IsMouseButtonDown("LeftButton") then return end   -- next tick
@@ -199,7 +281,7 @@ function ns.InteractButtonLabel()
   local db = ns.db
   if not db then return nil end
   local leftInteracts = (db.leftAction == "INTERACTMOUSEOVER" or db.leftAction == "NATIVE")
-    and not ns.autorunSwap and not (ns.combatEnemyMode and ns.EnemyClickMode())
+    and not ns.autorunSwap and not (ns.combatEnemyMode and ns.EnemyClickMode() and not useHeader())
   if leftInteracts then return "click" end
   if db.rightAction == "INTERACTMOUSEOVER" then return "right-click" end
   if db.interactKey and db.interactKey ~= "" then return db.interactKey end
@@ -210,6 +292,7 @@ function ns.RemoveClickBindings()
   if InCombatLockdown() then return end
   setClick("BUTTON1", nil)
   setClick("BUTTON2", nil)
+  if driverOn then headerSync(true, false) end
 end
 
 -- =====================================================================
@@ -340,6 +423,7 @@ aev:SetScript("OnEvent", function(self, event)
     if ns.RefreshBindings then ns.RefreshBindings() end
     syncAutorunSwap()
   elseif event == "PLAYER_LOGIN" then
+    ns.ProbeSecureAim()
     ns.UpdateEnemyMacro()
   elseif event == "PLAYER_SOFT_ENEMY_CHANGED" or event == "PLAYER_SOFT_INTERACT_CHANGED"
       or event == "UPDATE_MOUSEOVER_UNIT" then

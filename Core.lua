@@ -831,6 +831,10 @@ SlashCmdList["CTPI"] = function(msg)
       p("enabled=" .. tostring(db.enabled) .. "  mouselooking=" .. tostring(IsMouselooking()))
       p("cursor should be free? " .. (free and ("|cFFFF8800yes|r -> " .. why)
         or "|cFF00FF00no|r (should be mouselooking)"))
+      if (db.leftEnemy or "interact") ~= "interact" then
+        p("left-click on enemies: " .. db.leftEnemy .. ", loot in combat: "
+          .. (ns.secureAimOK and "|cFF00FF00on (secure aim)|r" or "|cFFFF8800off (secure snippets unavailable)|r"))
+      end
       local kf = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
       if kf then p("keyboard focus: " .. tostring(kf.GetName and kf:GetName() or "unnamed frame")) end
       p(string.format("fps %.0f, focus-loss threshold %.0f (background cap %s%s), cursor info: %s",
