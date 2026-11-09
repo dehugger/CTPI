@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.1 (unreleased, testing)
+
+- **Minimize / tab-out detection fixed:** the old check needed FPS below 20,
+  but the game's background cap is around 30, so it never fired. CTPI now
+  sets the background FPS cap to 8 while it runs (restored on logout or when
+  the option is turned off) and treats a steady ~8 fps as "not in the window".
+- **Less lag:** mouse bindings are applied as a diff instead of cleared and
+  re-set (each change makes the default UI redraw every action button's
+  keybind text), with a short hysteresis when the reticle leaves an enemy.
+  The look-at label and HUD arcs only redraw when something changed.
+- **Target lock fixes:** click bindings are put in place at combat start even
+  if a window had the cursor free, the left-click binding never swaps while
+  the button is held, and the lock key no longer clears your target when
+  nothing hostile is under the reticle.
+
 ## 2.2.0
 
 - **Left-click on enemies** (Behavior tab, `/ctpi leftenemy`): while left is

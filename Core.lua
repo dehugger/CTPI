@@ -83,27 +83,61 @@ end
 ns.freeCursorHeld = false
 
 -- ---------------------------------------------------------------------
--- Focus-loss heuristic. WoW exposes no window-focus event, so we infer it.
--- In windowed / borderless mode (where OnUpdate keeps firing while we're
--- tabbed out) the FPS gets pinned to the background cap (maxfpsbk); we watch
--- for that and free the cursor so the OS can use it in another app. Keyed off
--- maxfpsbk so it catches the throttle, not a normal combat dip, and suppressed
--- around loading screens. Fullscreen alt-tab freezes OnUpdate entirely, so
--- this code never runs there and never needs to.
+-- Focus-loss heuristic. WoW exposes no window-focus event to addons, so we
+-- infer it from the framerate: when the window is in the background or
+-- minimized, the game throttles itself to the background FPS cap.
+--
+-- The catch: the default background cap (around 30) is a framerate normal
+-- play also hits (vsync drops to 30 on a 60/120Hz screen), so it can't be
+-- told apart from a heavy fight. So by default CTPI sets the background cap
+-- to a distinctive 8 fps while it runs (and puts your own value back on
+-- logout or when the option is turned off). "Sitting at ~8 fps or lower for
+-- about a second" is then a reliable "you're not in the game window" signal.
+-- Without the managed cap we only catch very low fps (minimized / app nap).
+--
+-- Only works in windowed / borderless; exclusive fullscreen alt-tab freezes
+-- OnUpdate entirely. Loading screens are bracketed out.
 -- ---------------------------------------------------------------------
+local MANAGED_BK = 8
 local focusLost = false
 local lowSince = nil
 local inLoadingScreen = false
 local suppressUntil = 0
 
+-- apply / undo the managed background cap. out-of-game state lives in the db
+-- (savedMaxFPSBk / savedUseMaxFPSBk) so a crash can't lose your original.
+function ns.ApplyBackgroundCap()
+  local db = ns.db
+  if not db then return end
+  if db.enabled and db.unlockOnFocusLoss and db.manageBackgroundFps then
+    if db.savedMaxFPSBk == nil then
+      db.savedMaxFPSBk    = ns.GetCVar("maxFPSBk") or "30"
+      db.savedUseMaxFPSBk = ns.GetCVar("useMaxFPSBk") or "1"
+    end
+    pcall(ns.SetCVar, "useMaxFPSBk", 1)
+    pcall(ns.SetCVar, "maxFPSBk", MANAGED_BK)
+  else
+    ns.RestoreBackgroundCap()
+  end
+end
+
+function ns.RestoreBackgroundCap()
+  local db = ns.db
+  if not db or db.savedMaxFPSBk == nil then return end
+  pcall(ns.SetCVar, "maxFPSBk", db.savedMaxFPSBk)
+  pcall(ns.SetCVar, "useMaxFPSBk", db.savedUseMaxFPSBk or "1")
+  db.savedMaxFPSBk, db.savedUseMaxFPSBk = nil, nil
+end
+
 local function focusThreshold()
   local db = ns.db
   if db and db.focusFpsThreshold and db.focusFpsThreshold > 0 then
-    return db.focusFpsThreshold
+    return db.focusFpsThreshold                       -- manual override
   end
-  local bk = tonumber(ns.GetCVar("maxfpsbk")) or 0  -- background FPS cap
-  if bk > 0 then return math.min(bk + 4, 20) end
-  return 12
+  local useBk = ns.GetCVar("useMaxFPSBk") ~= "0"
+  local bk = tonumber(ns.GetCVar("maxFPSBk")) or 0
+  if useBk and bk > 0 then return math.min(bk + 2, 14) end
+  return 8   -- no background cap at all: only catch minimized / app nap
 end
 
 local function updateFocusState()
@@ -113,10 +147,10 @@ local function updateFocusState()
     return
   end
   local fps = GetFramerate() or 60
-  if fps < focusThreshold() then
+  if fps <= focusThreshold() then
     local now = GetTime()
     lowSince = lowSince or now
-    if (now - lowSince) >= (db.focusDwell or 1.25) then focusLost = true end
+    if (now - lowSince) >= (db.focusDwell or 1.0) then focusLost = true end
   else
     focusLost, lowSince = false, nil
   end
@@ -129,7 +163,7 @@ local function shouldFreeCursor()
   local db = ns.db
   if not db.enabled then return true, "master toggle is off" end
   if ns.freeCursorHeld then return true, "free-cursor key is toggled" end
-  if focusLost then return true, "window focus lost (low fps heuristic)" end
+  if focusLost then return true, "window in background / minimized (fps heuristic)" end
   if ns.SpellTargeting() then return true, "placing a ground spell" end
   if ns.IsTyping() then return true, "typing / an edit box has focus" end
   if ns.CursorBusy() then return true, "something is on the cursor" end
@@ -488,7 +522,8 @@ local defaults = {
   softTargetInteract = true,       -- vendors / nodes / mailboxes (softinteract)
   unlockOnFocusLoss  = true,       -- free cursor when the window loses focus (heuristic)
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
-  focusDwell         = 1.25,       -- seconds at low FPS before we call it focus-lost
+  focusDwell         = 1.0,        -- seconds at low FPS before we call it focus-lost
+  manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
   clearFocusKey      = "",          -- clear focus ("" = unbound)
@@ -608,6 +643,7 @@ end
 
 function handlers:PLAYER_LOGIN()
   applySoftTarget()
+  ns.ApplyBackgroundCap()
   buildReticleFrame()
   buildComboFrame()
   if ns.BuildHUD then ns.BuildHUD() end
@@ -642,6 +678,9 @@ end
 function handlers:ADDON_ACTION_BLOCKED(e, who, fn)   reportBlocked(e, who, fn) end
 function handlers:ADDON_ACTION_FORBIDDEN(e, who, fn) reportBlocked(e, who, fn) end
 
+-- put the player's own background fps cap back (re-applied next login)
+function handlers:PLAYER_LOGOUT() ns.RestoreBackgroundCap() end
+
 function handlers:LOADING_SCREEN_ENABLED()  ns.SetLoadingScreen(true)  end
 function handlers:LOADING_SCREEN_DISABLED() ns.SetLoadingScreen(false); ns.SuppressFocusFor(3) end
 function handlers:PLAYER_ENTERING_WORLD()   ns.SetLoadingScreen(false); ns.SuppressFocusFor(3) end
@@ -653,6 +692,7 @@ ev:RegisterEvent("ADDON_LOADED")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+ev:RegisterEvent("PLAYER_LOGOUT")
 pcall(ev.RegisterEvent, ev, "ADDON_ACTION_BLOCKED")
 pcall(ev.RegisterEvent, ev, "ADDON_ACTION_FORBIDDEN")
 pcall(ev.RegisterEvent, ev, "LOADING_SCREEN_ENABLED")
@@ -676,6 +716,7 @@ SlashCmdList["CTPI"] = function(msg)
   elseif cmd == "toggle" then
     db.enabled = not db.enabled
     ns.ForceReconcile()
+    ns.ApplyBackgroundCap()
     if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end
     if ns.UpdateShoulder then ns.UpdateShoulder() end
     p("master " .. (db.enabled and "|cFF00FF00on|r" or "|cFFFF0000off|r"))
@@ -730,9 +771,10 @@ SlashCmdList["CTPI"] = function(msg)
 
   elseif cmd == "focusunlock" then
     db.unlockOnFocusLoss = not db.unlockOnFocusLoss
+    ns.ApplyBackgroundCap()
     ns.ForceReconcile()
     p("unlock cursor on focus loss " .. (db.unlockOnFocusLoss and "on" or "off")
-      .. " |cFF888888(windowed/borderless only, ~" .. tostring(db.focusDwell or 1.25) .. "s lag)|r")
+      .. " |cFF888888(windowed/borderless only, ~" .. tostring(db.focusDwell or 1.0) .. "s lag)|r")
 
   elseif cmd == "focusfps" and rest ~= "" then
     local n = tonumber(rest)
@@ -788,8 +830,10 @@ SlashCmdList["CTPI"] = function(msg)
         or "|cFF00FF00no|r (should be mouselooking)"))
       local kf = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
       if kf then p("keyboard focus: " .. tostring(kf.GetName and kf:GetName() or "unnamed frame")) end
-      p(string.format("fps %.0f, focus-loss threshold %.0f, cursor info: %s",
-        GetFramerate() or 0, ns.FocusThreshold() or 0, tostring((GetCursorInfo and GetCursorInfo()) or "none")))
+      p(string.format("fps %.0f, focus-loss threshold %.0f (background cap %s%s), cursor info: %s",
+        GetFramerate() or 0, ns.FocusThreshold() or 0, tostring(ns.GetCVar("maxFPSBk")),
+        (ns.GetCVar("useMaxFPSBk") == "0") and ", off" or "",
+        tostring((GetCursorInfo and GetCursorInfo()) or "none")))
       if not free and not IsMouselooking() then
         MouselookStart()
         C_Timer.After(0.2, function()
@@ -808,8 +852,10 @@ SlashCmdList["CTPI"] = function(msg)
 
   elseif cmd == "reset" then
     if InCombatLockdown() then p("cant reset in combat"); return end
+    ns.RestoreBackgroundCap()   -- before the wipe forgets your original value
     wipe(db)
     copyDefaults(db, defaults)
+    ns.ApplyBackgroundCap()
     applySoftTarget()
     refreshReticle()
     ns.RefreshBindings()

@@ -575,13 +575,18 @@ local function buildBehaviorPage(page)
   local hCur = sectionHeader(page, "Cursor", cSoftI, -12)
   local cFocus = makeCheck(page, "Unlock cursor when the window loses focus",
     function() return db.unlockOnFocusLoss end,
-    function(v) db.unlockOnFocusLoss = v; ns.ForceReconcile() end)
+    function(v) db.unlockOnFocusLoss = v; ns.ApplyBackgroundCap(); ns.ForceReconcile() end)
   cFocus:SetPoint("TOPLEFT", hCur, "BOTTOMLEFT", -4, -4)
   controls[#controls+1] = cFocus
+  local cBk = makeCheck(page, "   Set background FPS to 8 so this is reliable (restored on logout)",
+    function() return db.manageBackgroundFps end,
+    function(v) db.manageBackgroundFps = v; ns.ApplyBackgroundCap(); ns.ForceReconcile() end)
+  cBk:SetPoint("TOPLEFT", cFocus, "BOTTOMLEFT", 0, -2)
+  controls[#controls+1] = cBk
   local cDbg = makeCheck(page, "Debug messages in chat (why the cursor frees)",
     function() return ns.debug and true or false end,
     function(v) ns.debug = v; ns.lastWhy = false end)
-  cDbg:SetPoint("TOPLEFT", cFocus, "BOTTOMLEFT", 0, -2)
+  cDbg:SetPoint("TOPLEFT", cBk, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cDbg
 
   -- target-tools readout (binds are set via slash; this just reflects them)

@@ -180,6 +180,7 @@ function ns.LayoutLook()
   nameFS:SetFont(font, size, "OUTLINE")
   hintFS:SetFont(font, math.max(9, math.floor(size * 0.85 + 0.5)), "OUTLINE")
   label:SetWidth(math.max(320, size * 24))
+  resetDrawn()   -- settings changed: redraw next tick
   label:ClearAllPoints()
   label:SetPoint("TOP", UIParent, "CENTER", T.x or 0, T.y or -24)
 end
@@ -223,6 +224,17 @@ end
 -- update (called every reconcile tick and on soft-target events)
 -- ---------------------------------------------------------------------
 local lastDbg
+-- what's currently drawn, so an unchanged label isnt re-laid-out every tick
+-- (SetText with inline icons is the expensive bit)
+local drawnName, drawnToken, drawnSig
+
+local function resetDrawn() drawnName, drawnToken, drawnSig = nil, nil, nil end
+
+local function hintSig(token)
+  local em = (token == "softenemy" and ns.EnemyClickMode) and ns.EnemyClickMode() or ""
+  local btn = ns.InteractButtonLabel and ns.InteractButtonLabel() or ""
+  return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn
+end
 
 function ns.UpdateLook(looking)
   if not label or not ns.db then return end
@@ -241,16 +253,28 @@ function ns.UpdateLook(looking)
   if mode == "compact" and token then
     local name = UnitName(token)
     if ns.IsSecret(name) or name then
-      local c = COLORS[token]
-      nameFS:SetText(name)
-      nameFS:SetTextColor(c[1], c[2], c[3])
-      hintFS:SetText(clickHint(token))
-      fitPlate()
+      local changed = false
+      if ns.IsSecret(name) then
+        nameFS:SetText(name); drawnName = nil; changed = true   -- cant compare a secret
+      elseif name ~= drawnName then
+        nameFS:SetText(name); drawnName = name; changed = true
+      end
+      if token ~= drawnToken then
+        local c = COLORS[token]
+        nameFS:SetTextColor(c[1], c[2], c[3])
+        drawnToken = token
+      end
+      local sig = hintSig(token)
+      if sig ~= drawnSig then
+        hintFS:SetText(clickHint(token)); drawnSig = sig; changed = true
+      end
+      if changed then fitPlate() end
       label:Show()
     else
-      label:Hide()
+      label:Hide(); resetDrawn()
     end
   elseif mode == "compact" and previewing then
+    resetDrawn()
     nameFS:SetText("Something you're looking at")
     local c = COLORS.softenemy
     nameFS:SetTextColor(c[1], c[2], c[3])
@@ -258,7 +282,7 @@ function ns.UpdateLook(looking)
     fitPlate()
     label:Show()
   else
-    label:Hide()
+    if label:IsShown() then label:Hide(); resetDrawn() end
   end
 
   -- full

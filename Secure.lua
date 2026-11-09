@@ -2,10 +2,14 @@ local addonName, ns = ...
 
 -- =====================================================================
 -- CTPI / Secure.lua
--- Mouse-button bindings while mouselook is engaged. Both are NATIVE
--- action bindings (SetOverrideBinding) -- the binding type that fires
--- under mouselook. No SecureActionButton / macro click, which needs a
--- clean cursor that mouselook hides.
+-- Mouse-button bindings while mouselook is engaged. Mostly NATIVE action
+-- bindings (SetOverrideBinding); the left-click-on-enemies option points
+-- BUTTON1 at a secure macro button instead (SetOverrideBindingClick).
+--
+-- PERFORMANCE: every binding change fires UPDATE_BINDINGS, which makes the
+-- default UI redraw the hotkey text on every action button. So bindings are
+-- applied as a diff (only keys whose action actually changed are touched)
+-- and never cleared + re-set wholesale.
 --
 --   LEFT  (BUTTON1) -> db.leftAction   (default INTERACTMOUSEOVER)
 --   RIGHT (BUTTON2) -> db.rightAction  (default TOGGLEAUTORUN)
@@ -31,6 +35,24 @@ local addonName, ns = ...
 
 local owner = CreateFrame("Frame", "CTPIBindingOwner", UIParent)
 ns.secureOwner = owner
+
+-- diff-based override bindings. bound[key] = "A:<ACTION>" | "C:<button>" | nil
+local function makeBinder(ownerFrame)
+  local bound = {}
+  return function(key, kind, value)
+    local desc = kind and (kind .. ":" .. value) or nil
+    if bound[key] == desc then return end
+    if not desc then
+      SetOverrideBinding(ownerFrame, true, key, nil)
+    elseif kind == "C" then
+      SetOverrideBindingClick(ownerFrame, true, key, value)
+    else
+      SetOverrideBinding(ownerFrame, true, key, value)
+    end
+    bound[key] = desc
+  end
+end
+local setClick = makeBinder(owner)
 
 local CLICK_ACTIONS = { INTERACTMOUSEOVER = true, MOVEFORWARD = true, TOGGLEAUTORUN = true }
 
@@ -93,6 +115,12 @@ local function lookingAtEnemy()
   return true
 end
 
+-- what BUTTON1 is aimed at out of combat, with a little hysteresis: going
+-- TO enemy mode is instant, going back waits 0.15s so sweeping the camera
+-- across a gap between two mobs doesnt flip the binding twice.
+local enemyUnder = false
+local enemyGen = 0
+
 -- "lock" / "lockattack" when left-click is acting on enemies right now, else nil
 function ns.EnemyClickMode()
   local db = ns.db
@@ -104,21 +132,49 @@ end
 
 function ns.ApplyClickBindings()
   if InCombatLockdown() then return end
-  ClearOverrideBindings(owner)
   applyNativeClick()
   local db = ns.db
   if not db then return end
+  if lookingAtEnemy() then enemyUnder = true end   -- fresh look on engage
   local left = db.leftAction
   if ns.autorunSwap then left = "MOVEFORWARD" end   -- left-click cancels autorun (below)
-  if ns.EnemyClickMode() and (ns.combatEnemyMode or lookingAtEnemy()) then
-    SetOverrideBindingClick(owner, true, "BUTTON1", "CTPIEnemyClickButton")
-    left = nil
-  end
-  if left and CLICK_ACTIONS[left] then
-    SetOverrideBinding(owner, true, "BUTTON1", left)
+  if ns.EnemyClickMode() and (ns.combatEnemyMode or enemyUnder) then
+    setClick("BUTTON1", "C", "CTPIEnemyClickButton")
+  elseif left and CLICK_ACTIONS[left] then
+    setClick("BUTTON1", "A", left)
+  else
+    setClick("BUTTON1", nil)
   end
   if CLICK_ACTIONS[db.rightAction] then
-    SetOverrideBinding(owner, true, "BUTTON2", db.rightAction)
+    setClick("BUTTON2", "A", db.rightAction)
+  else
+    setClick("BUTTON2", nil)
+  end
+end
+
+-- re-aim BUTTON1 after the looked-at thing changed. never while the left
+-- button is held: swapping a binding mid-press splits the press across two
+-- actions (down on one, up on the other).
+local function reaimLeft()
+  if not ns.EnemyClickMode() or InCombatLockdown() or not IsMouselooking() then return end
+  if IsMouseButtonDown and IsMouseButtonDown("LeftButton") then
+    C_Timer.After(0.05, reaimLeft)
+    return
+  end
+  ns.ApplyClickBindings()
+end
+
+local function onSoftChanged()
+  enemyGen = enemyGen + 1
+  if lookingAtEnemy() then
+    if not enemyUnder then enemyUnder = true; reaimLeft() end
+  elseif enemyUnder then
+    local gen = enemyGen
+    C_Timer.After(0.15, function()
+      if gen ~= enemyGen or lookingAtEnemy() then return end
+      enemyUnder = false
+      reaimLeft()
+    end)
   end
 end
 
@@ -136,7 +192,8 @@ end
 
 function ns.RemoveClickBindings()
   if InCombatLockdown() then return end
-  ClearOverrideBindings(owner)
+  setClick("BUTTON1", nil)
+  setClick("BUTTON2", nil)
 end
 
 -- =====================================================================
@@ -151,6 +208,8 @@ end
 --   clrf  -> /clearfocus
 -- =====================================================================
 local toolOwner = CreateFrame("Frame", "CTPIToolBindingOwner", UIParent)
+local setTool = makeBinder(toolOwner)
+local toolKeys = {}   -- key -> true for keys we've bound, so a rebind can drop old ones
 
 local function secureMacroButton(name, macrotext)
   local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
@@ -163,23 +222,25 @@ local function secureMacroButton(name, macrotext)
   return b
 end
 
-secureMacroButton("CTPILockButton",       "/target [@softenemy]")
+-- only retargets when something hostile is actually under the reticle;
+-- the old "/target [@softenemy]" could clear your target when it wasnt
+secureMacroButton("CTPILockButton",       "/target [@softenemy,harm,nodead] softenemy")
 secureMacroButton("CTPIFocusButton",      "/focus [@target,harm][@softenemy]")
 secureMacroButton("CTPIClearFocusButton", "/clearfocus")
 
 function ns.ApplyToolBindings()
   if InCombatLockdown() then return end
-  ClearOverrideBindings(toolOwner)
   local db = ns.db
   if not db then return end
-  if db.lockKey and db.lockKey ~= "" then
-    SetOverrideBindingClick(toolOwner, true, db.lockKey, "CTPILockButton")
+  local want = {}
+  if db.lockKey and db.lockKey ~= "" then want[db.lockKey] = "CTPILockButton" end
+  if db.focusKey and db.focusKey ~= "" then want[db.focusKey] = "CTPIFocusButton" end
+  if db.clearFocusKey and db.clearFocusKey ~= "" then want[db.clearFocusKey] = "CTPIClearFocusButton" end
+  for key in pairs(toolKeys) do
+    if not want[key] then setTool(key, nil); toolKeys[key] = nil end
   end
-  if db.focusKey and db.focusKey ~= "" then
-    SetOverrideBindingClick(toolOwner, true, db.focusKey, "CTPIFocusButton")
-  end
-  if db.clearFocusKey and db.clearFocusKey ~= "" then
-    SetOverrideBindingClick(toolOwner, true, db.clearFocusKey, "CTPIClearFocusButton")
+  for key, btn in pairs(want) do
+    setTool(key, "C", btn); toolKeys[key] = true
   end
 end
 
@@ -243,11 +304,14 @@ aev:SetScript("OnEvent", function(self, event)
   elseif event == "PLAYER_STOPPED_MOVING" then
     setAuto(false)
   elseif event == "PLAYER_REGEN_DISABLED" then
-    -- last moment bindings can change: left back to Interact (or enemy mode)
-    local changed = false
-    if ns.autorunSwap then ns.autorunSwap = false; changed = true end
-    if ns.EnemyClickMode() then ns.combatEnemyMode = true; changed = true end
-    if changed and ns.RefreshBindings then ns.RefreshBindings() end
+    -- last moment bindings can change. left goes back to Interact (or enemy
+    -- mode), and the click bindings are put in place even if the cursor is
+    -- free right now: combat often starts with a loot window / bag / dialog
+    -- open, and nothing can bind them again until combat ends. (clicks on UI
+    -- windows still go to the windows; only world clicks use these.)
+    ns.autorunSwap = false
+    if ns.EnemyClickMode() then ns.combatEnemyMode = true end
+    if ns.db and ns.db.enabled then ns.ApplyClickBindings() end
   elseif event == "PLAYER_REGEN_ENABLED" then
     ns.combatEnemyMode = false
     if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end
@@ -256,9 +320,7 @@ aev:SetScript("OnEvent", function(self, event)
   elseif event == "PLAYER_LOGIN" then
     ns.UpdateEnemyMacro()
   elseif event == "PLAYER_SOFT_ENEMY_CHANGED" or event == "PLAYER_SOFT_INTERACT_CHANGED" then
-    -- out of combat, follow what's under the reticle
-    if ns.EnemyClickMode() and not InCombatLockdown() and IsMouselooking() then
-      ns.ApplyClickBindings()
-    end
+    -- out of combat, follow what's under the reticle (with hysteresis)
+    if ns.EnemyClickMode() and not InCombatLockdown() then onSoftChanged() end
   end
 end)

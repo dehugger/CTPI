@@ -34,7 +34,7 @@ local OPPOSITE = { left = "right", right = "left", below = "above", above = "bel
 
 local hud, swipe, powerArc, gcdArc
 local previewing, previewTicker, previewStart = false, nil, 0
-local lastMax, lastType
+local lastMax, lastType, lastCur
 local gcdStart, gcdDur, gcdSecret = 0, 0, false
 
 -- ---------------------------------------------------------------------
@@ -131,8 +131,13 @@ function ns.BuildHUD()
     b:SetMinMaxValues((i - 1) / ARC_DOTS, i / ARC_DOTS)
     b:SetStatusBarColor(0.88, 0.90, 1.00, 0.95)
   end
+  -- only touch the dots when the value actually moved (an idle track in
+  -- combat would otherwise re-set 30 bars every frame)
+  gcdArc.last = -1
   gcdArc:SetScript("OnUpdate", function(self)
     local rem = gcdRemaining()
+    if math.abs(rem - self.last) < 0.002 then return end
+    self.last = rem
     for _, b in ipairs(self.dots) do b:SetValue(rem) end
   end)
   gcdArc:Hide()
@@ -164,7 +169,8 @@ function ns.LayoutHUD()
   local gRadius = (gSide == pSide) and (radius + gap) or radius
   placeDots(gcdArc.dots, hud, gSide, span, gRadius, dot)
 
-  lastMax, lastType = nil, nil   -- force ranges + color to refresh
+  lastMax, lastType, lastCur = nil, nil, nil   -- force ranges + color to refresh
+  gcdArc.last = -1
   if ns.LayoutCombo then ns.LayoutCombo() end   -- the combo ring follows the arc
 end
 
@@ -220,7 +226,7 @@ local function updatePower()
   local cur = UnitPower("player", ptype)
 
   if max ~= lastMax then
-    lastMax = max
+    lastMax, lastCur = max, nil   -- new ranges: re-feed the value below
     for i, b in ipairs(powerArc.dots) do
       b:SetMinMaxValues((i - 1) * max / ARC_DOTS, i * max / ARC_DOTS)
     end
@@ -232,7 +238,13 @@ local function updatePower()
     if type(c) == "table" and c.r then cr, cg, cb = c.r, c.g, c.b end
     for _, b in ipairs(powerArc.dots) do b:SetStatusBarColor(cr, cg, cb, 0.95) end
   end
-  for _, b in ipairs(powerArc.dots) do b:SetValue(cur) end
+  if ns.IsSecret(cur) then
+    for _, b in ipairs(powerArc.dots) do b:SetValue(cur) end   -- cant compare, just feed it
+    lastCur = nil
+  elseif cur ~= lastCur then
+    for _, b in ipairs(powerArc.dots) do b:SetValue(cur) end
+    lastCur = cur
+  end
 
   local show
   if not P.hideIdle or previewing or InCombatLockdown() then
