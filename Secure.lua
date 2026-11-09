@@ -107,19 +107,47 @@ function ns.UpdateEnemyMacro()
   enemyBtn:SetAttribute("macrotext", enemyMacro())
 end
 
-local function lookingAtEnemy()
-  local e = UnitExists("softenemy")
-  if ns.IsSecret(e) or not e then return false end
-  local i = UnitExists("softinteract")
-  if (not ns.IsSecret(i)) and i then return false end   -- an interactable wins (loot, npc)
-  return true
+-- ---------------------------------------------------------------------
+-- What's under the reticle, for choosing what left-click does out of
+-- combat. Keyed off "mouseover" first: under mouselook that's exactly the
+-- unit at screen center, i.e. exactly what INTERACTMOUSEOVER will act on.
+-- (the soft-target tokens reach a wide cone, so a live mob NEXT to a
+-- corpse used to win and turn your loot click into a lock.)
+--   "enemy"  a living hostile unit
+--   "other"  something we know isnt that: a corpse, an npc, a player
+--   "none"   nothing under the reticle; fall back to the soft targets
+-- ---------------------------------------------------------------------
+local function plain(v) return (not ns.IsSecret(v)) and v end
+
+local function aimState()
+  local mo = UnitExists("mouseover")
+  if ns.IsSecret(mo) then return "none" end
+  if mo then
+    local dead = UnitIsDead("mouseover")
+    if ns.IsSecret(dead) or dead then return "other" end   -- corpses: loot / skin
+    local harm = UnitCanAttack("player", "mouseover")
+    if ns.IsSecret(harm) then return "none" end
+    return harm and "enemy" or "other"
+  end
+  if plain(UnitExists("softinteract")) then return "other" end   -- interactable wins
+  if plain(UnitExists("softenemy")) then return "enemy" end
+  return "none"
 end
 
--- what BUTTON1 is aimed at out of combat, with a little hysteresis: going
--- TO enemy mode is instant, going back waits 0.15s so sweeping the camera
--- across a gap between two mobs doesnt flip the binding twice.
+-- left-click's current aim out of combat. a known enemy flips to enemy mode
+-- right away; a known non-enemy (corpse, npc) flips back right away; empty
+-- space waits 0.15s first, so sweeping across a gap between two mobs doesnt
+-- flip the binding twice.
 local enemyUnder = false
-local enemyGen = 0
+local lastEnemyAt = 0
+
+local function wantEnemy()
+  local st = aimState()
+  local now = GetTime()
+  if st == "enemy" then lastEnemyAt = now; return true end
+  if st == "other" then return false end
+  return (now - lastEnemyAt) < 0.15
+end
 
 -- "lock" / "lockattack" when left-click is acting on enemies right now, else nil
 function ns.EnemyClickMode()
@@ -135,7 +163,7 @@ function ns.ApplyClickBindings()
   applyNativeClick()
   local db = ns.db
   if not db then return end
-  if lookingAtEnemy() then enemyUnder = true end   -- fresh look on engage
+  if not ns.combatEnemyMode then enemyUnder = wantEnemy() end   -- always a fresh look
   local left = db.leftAction
   if ns.autorunSwap then left = "MOVEFORWARD" end   -- left-click cancels autorun (below)
   if ns.EnemyClickMode() and (ns.combatEnemyMode or enemyUnder) then
@@ -152,41 +180,29 @@ function ns.ApplyClickBindings()
   end
 end
 
--- re-aim BUTTON1 after the looked-at thing changed. never while the left
--- button is held: swapping a binding mid-press splits the press across two
--- actions (down on one, up on the other).
-local function reaimLeft()
-  if not ns.EnemyClickMode() or InCombatLockdown() or not IsMouselooking() then return end
-  if IsMouseButtonDown and IsMouseButtonDown("LeftButton") then
-    C_Timer.After(0.05, reaimLeft)
-    return
-  end
+-- polled from the reconcile loop (Core.lua) and on mouseover / soft-target
+-- changes. with the diff binder this is free unless the aim actually changed.
+-- never re-aims while the left button is held: swapping a binding mid-press
+-- splits the press across two actions (down on one, up on the other).
+function ns.TickClickAim()
+  if not ns.EnemyClickMode() or InCombatLockdown() or ns.combatEnemyMode
+     or not IsMouselooking() then return end
+  local want = wantEnemy()
+  if want == enemyUnder then return end
+  if IsMouseButtonDown and IsMouseButtonDown("LeftButton") then return end   -- next tick
   ns.ApplyClickBindings()
 end
 
-local function onSoftChanged()
-  enemyGen = enemyGen + 1
-  if lookingAtEnemy() then
-    if not enemyUnder then enemyUnder = true; reaimLeft() end
-  elseif enemyUnder then
-    local gen = enemyGen
-    C_Timer.After(0.15, function()
-      if gen ~= enemyGen or lookingAtEnemy() then return end
-      enemyUnder = false
-      reaimLeft()
-    end)
-  end
-end
-
--- which mouse button interacts right now ("click" / "right-click" / nil),
--- for the look-at label's hint
+-- what currently interacts ("click" / "right-click" / a key / nil), for the
+-- look-at label's hint
 function ns.InteractButtonLabel()
   local db = ns.db
   if not db then return nil end
-  if (db.leftAction == "INTERACTMOUSEOVER" or db.leftAction == "NATIVE") and not ns.autorunSwap then
-    return "click"
-  end
+  local leftInteracts = (db.leftAction == "INTERACTMOUSEOVER" or db.leftAction == "NATIVE")
+    and not ns.autorunSwap and not (ns.combatEnemyMode and ns.EnemyClickMode())
+  if leftInteracts then return "click" end
   if db.rightAction == "INTERACTMOUSEOVER" then return "right-click" end
+  if db.interactKey and db.interactKey ~= "" then return db.interactKey end
   return nil
 end
 
@@ -236,11 +252,16 @@ function ns.ApplyToolBindings()
   if db.lockKey and db.lockKey ~= "" then want[db.lockKey] = "CTPILockButton" end
   if db.focusKey and db.focusKey ~= "" then want[db.focusKey] = "CTPIFocusButton" end
   if db.clearFocusKey and db.clearFocusKey ~= "" then want[db.clearFocusKey] = "CTPIClearFocusButton" end
+  -- interact key: loot / skin / talk from the keyboard, including in combat
+  -- when left-click is in lock mode. a native action, not a button click.
+  if db.interactKey and db.interactKey ~= "" then want[db.interactKey] = "=INTERACTMOUSEOVER" end
   for key in pairs(toolKeys) do
     if not want[key] then setTool(key, nil); toolKeys[key] = nil end
   end
-  for key, btn in pairs(want) do
-    setTool(key, "C", btn); toolKeys[key] = true
+  for key, target in pairs(want) do
+    if target:sub(1, 1) == "=" then setTool(key, "A", target:sub(2))
+    else setTool(key, "C", target) end
+    toolKeys[key] = true
   end
 end
 
@@ -290,7 +311,8 @@ if StopAutoRun   then hooksecurefunc("StopAutoRun",   function() setAuto(false) 
 local aev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING",
                      "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_LOGIN",
-                     "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_SOFT_INTERACT_CHANGED" }) do
+                     "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_SOFT_INTERACT_CHANGED",
+                     "UPDATE_MOUSEOVER_UNIT" }) do
   pcall(aev.RegisterEvent, aev, e)
 end
 aev:SetScript("OnEvent", function(self, event)
@@ -319,8 +341,8 @@ aev:SetScript("OnEvent", function(self, event)
     syncAutorunSwap()
   elseif event == "PLAYER_LOGIN" then
     ns.UpdateEnemyMacro()
-  elseif event == "PLAYER_SOFT_ENEMY_CHANGED" or event == "PLAYER_SOFT_INTERACT_CHANGED" then
-    -- out of combat, follow what's under the reticle (with hysteresis)
-    if ns.EnemyClickMode() and not InCombatLockdown() then onSoftChanged() end
+  elseif event == "PLAYER_SOFT_ENEMY_CHANGED" or event == "PLAYER_SOFT_INTERACT_CHANGED"
+      or event == "UPDATE_MOUSEOVER_UNIT" then
+    ns.TickClickAim()   -- react right away instead of waiting for the next tick
   end
 end)

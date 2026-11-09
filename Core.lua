@@ -434,6 +434,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
     if not IsMouselooking() then engage() end
   end
   local looking = IsMouselooking()
+  if ns.TickClickAim then ns.TickClickAim() end      -- Secure.lua: left-click lock vs interact
   if ns.UpdateLook then ns.UpdateLook(looking) end   -- Look.lua
   if ns.UpdateHUD then ns.UpdateHUD(looking) end     -- HUD.lua
   updateCombo()           -- poll combo points (cheap; no event-name guessing)
@@ -527,6 +528,7 @@ local defaults = {
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
   clearFocusKey      = "",          -- clear focus ("" = unbound)
+  interactKey        = "",          -- keyboard interact (loot / skin / talk), works in combat
   tooltip = {
     mode = "compact", -- "compact" (name + click hint) | "full" (game tooltip) | "off"
     fontSize  = 16,       -- compact label text size (hint is 85% of this)
@@ -785,10 +787,11 @@ SlashCmdList["CTPI"] = function(msg)
       p("usage: /ctpi focusfps <number>  (0 = auto)")
     end
 
-  elseif cmd == "lockkey" or cmd == "focuskey" or cmd == "clearfocuskey" then
+  elseif cmd == "lockkey" or cmd == "focuskey" or cmd == "clearfocuskey" or cmd == "interactkey" then
     if InCombatLockdown() then p("cant change keybinds in combat"); return end
     local field = (cmd == "lockkey" and "lockKey")
-      or (cmd == "focuskey" and "focusKey") or "clearFocusKey"
+      or (cmd == "focuskey" and "focusKey")
+      or (cmd == "interactkey" and "interactKey") or "clearFocusKey"
     local key = rest:upper():gsub("%s+", "")
     if key == "NONE" or key == "OFF" then key = "" end
     db[field] = key
@@ -866,7 +869,7 @@ SlashCmdList["CTPI"] = function(msg)
   else
     p("|cFFFFFF00/ctpi|r opens settings. also: toggle, left/right <interact|run|autorun|none>, "
       .. "softenemy, softfriend, softinteract, focusunlock, "
-      .. "lockkey/focuskey/clearfocuskey <BIND|none>, shoulder [off|always|cursor|target], "
+      .. "lockkey/focuskey/clearfocuskey/interactkey <BIND|none>, shoulder [off|always|cursor|target], "
       .. "block/unblock <Frame>, why, debug, reset")
   end
 end

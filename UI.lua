@@ -605,8 +605,9 @@ local function buildBehaviorPage(page)
     local function k(v) return (v and v ~= "") and v or "unbound" end
     self:SetText("Target lock |cFFc8a25e" .. k(db.lockKey) .. "|r   "
       .. "Set focus |cFFc8a25e" .. k(db.focusKey) .. "|r   "
-      .. "Clear focus |cFFc8a25e" .. k(db.clearFocusKey) .. "|r\n"
-      .. "|cFF888888change with /ctpi lockkey|focuskey|clearfocuskey <BIND|none>.\n"
+      .. "Clear focus |cFFc8a25e" .. k(db.clearFocusKey) .. "|r   "
+      .. "Interact |cFFc8a25e" .. k(db.interactKey) .. "|r\n"
+      .. "|cFF888888change with /ctpi lockkey|focuskey|clearfocuskey|interactkey <BIND|none>.\n"
       .. "Master toggle and free cursor are in Key Bindings > AddOns.|r")
   end
   toolsLbl:Reload()

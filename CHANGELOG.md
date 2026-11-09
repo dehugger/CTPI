@@ -14,6 +14,14 @@
   if a window had the cursor free, the left-click binding never swaps while
   the button is held, and the lock key no longer clears your target when
   nothing hostile is under the reticle.
+- **Looting with lock mode fixed:** what left-click does is now decided from
+  exactly what's under the reticle (the mouseover unit), re-checked
+  continuously instead of only on soft-target changes. Corpses and NPCs
+  always get interact, so looting and skinning work without toggling the
+  lock off. (A live mob next to a corpse used to win, and the choice could
+  stay stuck on "enemy" after a kill.)
+- **Interact key** (`/ctpi interactkey <KEY>`): an optional keyboard interact
+  that also works in combat, when left-click is in lock mode.
 
 ## 2.2.0
 

@@ -106,7 +106,8 @@ local function clickHint(token)
     if style == "text" then
       parts[#parts + 1] = btn .. ": " .. act:lower()
     else
-      local p = atlas(BUTTON_ATLAS[btn] or "NPE_LeftClick", s) .. tex(ACTION_ICON[act], s)
+      local how = BUTTON_ATLAS[btn] and atlas(BUTTON_ATLAS[btn], s) or ("|cFFc8a25e" .. btn .. "|r ")
+      local p = how .. tex(ACTION_ICON[act], s)
       if style == "icons" then p = p .. " " .. ACTION_WORD[act] end
       parts[#parts + 1] = p
     end
