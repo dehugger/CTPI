@@ -88,24 +88,114 @@ local enemyBtn = CreateFrame("Button", "CTPIEnemyClickButton", UIParent, "Secure
 enemyBtn:RegisterForClicks("AnyUp", "AnyDown")
 enemyBtn:SetAttribute("type", "macro")
 
-local function enemyMacro()
-  local db = ns.db
-  local lock = "/target [@softenemy,harm,nodead] softenemy"
-  if not db or db.leftEnemy ~= "lockattack" then return lock end
-  local _, class = UnitClass("player")
-  if class == "HUNTER" then
-    local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(75))
-      or (GetSpellInfo and GetSpellInfo(75)) or "Auto Shot"
-    if ns.IsSecret(name) then name = "Auto Shot" end
-    return lock .. "\n/cast [@target,harm,nodead] !" .. name
-  end
-  return lock .. "\n/startattack [@target,harm,nodead]"
+-- ---------------------------------------------------------------------
+-- Context-aware enemy click ("lock + attack" mode).
+-- The enemy button's macro is rewritten out of combat whenever the
+-- situation changes (cheap: only when the text actually differs). Out of
+-- combat, addon code can look at anything: creature type, who you've
+-- already pickpocketed, stealth. Shift is checked by the macro itself at
+-- click time ([mod:shift]), so that part works everywhere.
+--
+--   everyone   lock the thing under the reticle, then auto attack
+--              (never while stealthed, so a click can't break stealth)
+--   hunter     lock, then Auto Shot
+--   rogue      stealthed, out of combat (it hasn't noticed you):
+--                humanoid you haven't robbed yet -> Pick Pocket, shift: Sap
+--                anything else                   -> Ambush,      shift: Garrote
+--              stealthed in combat (Vanish)      -> Ambush,      shift: Garrote
+--              not stealthed                     -> lock + auto attack
+-- In combat the macro can't be rewritten, so the combat version (set on
+-- PLAYER_REGEN_DISABLED) uses [stealth] conditionals instead.
+-- ---------------------------------------------------------------------
+local SPELL = { PICKPOCKET = 921, SAP = 6770, AMBUSH = 8676, GARROTE = 703, AUTOSHOT = 75 }
+local FALLBACK_NAME = { [921] = "Pick Pocket", [6770] = "Sap", [8676] = "Ambush",
+                        [703] = "Garrote", [75] = "Auto Shot" }
+
+local function spellName(id)
+  local n = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(id)
+  if not n and GetSpellInfo then n = GetSpellInfo(id) end
+  if not n or ns.IsSecret(n) then n = FALLBACK_NAME[id] end
+  return n
 end
 
-function ns.UpdateEnemyMacro()
-  if InCombatLockdown() then return end
-  enemyBtn:SetAttribute("macrotext", enemyMacro())
+-- GUIDs you've already pickpocketed (a mob can only be robbed once)
+local picked, pickedCount = {}, 0
+local function markPicked(unit)
+  local g = UnitGUID(unit)
+  if not g or ns.IsSecret(g) or picked[g] then return end
+  picked[g] = true
+  pickedCount = pickedCount + 1
+  if pickedCount > 500 then wipe(picked); pickedCount = 0 end   -- respawns get new GUIDs anyway
 end
+
+-- target what's exactly under the reticle first, then the soft enemy
+local TARGET_LINE = "/target [@mouseover,harm,nodead] mouseover; [@softenemy,harm,nodead] softenemy"
+local ATTACK_LINE = "/startattack [nostealth,@target,harm,nodead]"
+
+local function aimUnit()
+  local mo = UnitExists("mouseover")
+  if not ns.IsSecret(mo) and mo then
+    local h, d = UnitCanAttack("player", "mouseover"), UnitIsDead("mouseover")
+    if not ns.IsSecret(h) and h and not ns.IsSecret(d) and not d then return "mouseover" end
+  end
+  local se = UnitExists("softenemy")
+  if not ns.IsSecret(se) and se then return "softenemy" end
+end
+
+local function isHumanoid(u)
+  local name, id = UnitCreatureType(u)
+  if ns.IsSecret(name) or ns.IsSecret(id) then return false end
+  if type(id) == "number" then return id == 7 end
+  return name == "Humanoid"
+end
+
+-- returns macrotext, hint ({ main = spellID, shift = spellID } or nil)
+local function enemyPlan(forCombat)
+  local db = ns.db
+  if not db or db.leftEnemy ~= "lockattack" then return TARGET_LINE, nil end
+  local _, class = UnitClass("player")
+  if class == "HUNTER" then
+    return TARGET_LINE .. "\n/cast [@target,harm,nodead] !" .. spellName(SPELL.AUTOSHOT),
+           { main = SPELL.AUTOSHOT }
+  end
+  if class == "ROGUE" and db.rogueOpeners then
+    local opener = "/cast [stealth,mod:shift] " .. spellName(SPELL.GARROTE)
+      .. "; [stealth] " .. spellName(SPELL.AMBUSH)
+    if not forCombat and IsStealthed() and not InCombatLockdown() then
+      local u = aimUnit()
+      local g = u and UnitGUID(u)
+      local robbed = g and not ns.IsSecret(g) and picked[g]
+      if u and isHumanoid(u) and not robbed then
+        return TARGET_LINE .. "\n/cast [mod:shift] " .. spellName(SPELL.SAP) .. "; " .. spellName(SPELL.PICKPOCKET),
+               { main = SPELL.PICKPOCKET, shift = SPELL.SAP }
+      end
+      return TARGET_LINE .. "\n" .. opener, { main = SPELL.AMBUSH, shift = SPELL.GARROTE }
+    end
+    return TARGET_LINE .. "\n" .. opener .. "\n" .. ATTACK_LINE, nil
+  end
+  return TARGET_LINE .. "\n" .. ATTACK_LINE, nil
+end
+
+local currentMacro, currentHint
+-- forCombat: called on PLAYER_REGEN_DISABLED, the last chance to set it
+function ns.UpdateEnemyMacro(forCombat)
+  if InCombatLockdown() then return end
+  local text, hint = enemyPlan(forCombat)
+  currentHint = hint
+  if text ~= currentMacro then
+    enemyBtn:SetAttribute("macrotext", text)
+    currentMacro = text
+  end
+end
+
+-- for the look-at label: what a click / shift-click on an enemy will cast
+function ns.EnemyClickHint() return currentHint end
+function ns.SpellIcon(id)
+  local t = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
+  if ns.IsSecret(t) then return nil end
+  return t
+end
+ns.SpellName = spellName
 
 -- ---------------------------------------------------------------------
 -- What's under the reticle, for choosing what left-click does out of
@@ -395,11 +485,19 @@ local aev = CreateFrame("Frame")
 for _, e in ipairs({ "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING",
                      "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_LOGIN",
                      "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_SOFT_INTERACT_CHANGED",
-                     "UPDATE_MOUSEOVER_UNIT" }) do
+                     "UPDATE_MOUSEOVER_UNIT", "UNIT_SPELLCAST_SUCCEEDED", "UI_ERROR_MESSAGE" }) do
   pcall(aev.RegisterEvent, aev, e)
 end
-aev:SetScript("OnEvent", function(self, event)
-  if event == "PLAYER_STARTED_MOVING" then
+aev:SetScript("OnEvent", function(self, event, a1, a2, a3)
+  if event == "UNIT_SPELLCAST_SUCCEEDED" then
+    -- a1 = unit, a3 = spellID: remember who you've pickpocketed
+    if a1 == "player" and not ns.IsSecret(a3) and a3 == SPELL.PICKPOCKET then markPicked("target") end
+  elseif event == "UI_ERROR_MESSAGE" then
+    -- "no pockets to pick" also means this one's done
+    if ERR_ALREADY_PICKPOCKETED and not ns.IsSecret(a2) and a2 == ERR_ALREADY_PICKPOCKETED then
+      markPicked("target")
+    end
+  elseif event == "PLAYER_STARTED_MOVING" then
     -- fallback if the hooks dont fire: right-click autorun just started
     local db = ns.db
     if db and db.rightAction == "TOGGLEAUTORUN" and IsMouseButtonDown
@@ -416,6 +514,7 @@ aev:SetScript("OnEvent", function(self, event)
     -- windows still go to the windows; only world clicks use these.)
     ns.autorunSwap = false
     if ns.EnemyClickMode() then ns.combatEnemyMode = true end
+    ns.UpdateEnemyMacro(true)   -- the in-combat version of the click
     if ns.db and ns.db.enabled then ns.ApplyClickBindings() end
   elseif event == "PLAYER_REGEN_ENABLED" then
     ns.combatEnemyMode = false

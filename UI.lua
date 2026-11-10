@@ -534,7 +534,13 @@ local function buildBehaviorPage(page)
   enemyBtns[1]:SetPoint("TOPLEFT", enemyLbl, "BOTTOMLEFT", 0, -6)
   repaints[#repaints+1] = enemyRepaint
 
-  local rightLbl = smallLabel(page, "Right-click", enemyBtns[1], 0, -10)
+  local cOpen = makeCheck(page, "Rogue: stealth click = Pick Pocket / Ambush (Shift: Sap / Garrote)",
+    function() return db.rogueOpeners end,
+    function(v) db.rogueOpeners = v; if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end end)
+  cOpen:SetPoint("TOPLEFT", enemyBtns[1], "BOTTOMLEFT", -4, -4)
+  controls[#controls+1] = cOpen
+
+  local rightLbl = smallLabel(page, "Right-click", cOpen, 4, -8)
   local rightBtns, rightRepaint = makeChoiceRow(page, CLICK_CHOICES,
     function() return db.rightAction end,
     function(v) db.rightAction = v; ns.RefreshBindings() end)
@@ -616,7 +622,7 @@ end
 
 local function buildPanel()
   panel = CreateFrame("Frame", "CTPIConfigFrame", UIParent, "BackdropTemplate")
-  panel:SetSize(360, 740)
+  panel:SetSize(360, 770)
   -- default off to the left so the centered reticle stays visible
   panel:SetPoint("LEFT", UIParent, "LEFT", 40, 0)
   panel:SetBackdrop({

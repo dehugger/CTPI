@@ -91,7 +91,23 @@ local function clickHint(token)
   local btn = ns.InteractButtonLabel and ns.InteractButtonLabel()
   local act = btn and actionFor(token)
   local enemyMode = token == "softenemy" and ns.EnemyClickMode and ns.EnemyClickMode()
-  if enemyMode then
+  local spellHint = enemyMode and ns.EnemyClickHint and ns.EnemyClickHint()
+  if spellHint then
+    -- context click: show what a click / shift-click will actually cast
+    local function one(id)
+      local icon = ns.SpellIcon(id)
+      local name = ns.SpellName(id)
+      if style == "text" then return name:lower() end
+      local t = icon and tex(icon, s) or ""
+      if style == "icons" then t = t .. " " .. name end
+      return t
+    end
+    local main = (style == "text" and "click: " or atlas("NPE_LeftClick", s)) .. one(spellHint.main)
+    parts[#parts + 1] = main
+    if spellHint.shift then
+      parts[#parts + 1] = (style == "text" and "shift: " or "|cFFc8a25eShift|r ") .. one(spellHint.shift)
+    end
+  elseif enemyMode then
     -- left-click locks (and maybe attacks) instead of plain interact
     local word = (enemyMode == "lockattack") and "Lock + attack" or "Lock"
     if style == "text" then
@@ -112,7 +128,7 @@ local function clickHint(token)
       parts[#parts + 1] = p
     end
   end
-  if token == "softenemy" and not enemyMode and db.lockKey and db.lockKey ~= "" then
+  if token == "softenemy" and not enemyMode and db.lockKey and db.lockKey ~= "" then -- (click locks in enemy mode)
     if style == "text" then
       parts[#parts + 1] = db.lockKey:lower() .. ": lock"
     else
@@ -234,7 +250,9 @@ local function resetDrawn() drawnName, drawnToken, drawnSig = nil, nil, nil end
 local function hintSig(token)
   local em = (token == "softenemy" and ns.EnemyClickMode) and ns.EnemyClickMode() or ""
   local btn = ns.InteractButtonLabel and ns.InteractButtonLabel() or ""
-  return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn
+  local h = (token == "softenemy" and ns.EnemyClickHint) and ns.EnemyClickHint()
+  local hs = h and (tostring(h.main) .. "/" .. tostring(h.shift)) or ""
+  return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn .. "|" .. hs
 end
 
 function ns.UpdateLook(looking)

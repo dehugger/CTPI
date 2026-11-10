@@ -435,6 +435,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
   end
   local looking = IsMouselooking()
   if ns.TickClickAim then ns.TickClickAim() end      -- Secure.lua: left-click lock vs interact
+  if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end   -- context click (no-op in combat / if unchanged)
   if ns.UpdateLook then ns.UpdateLook(looking) end   -- Look.lua
   if ns.UpdateHUD then ns.UpdateHUD(looking) end     -- HUD.lua
   updateCombo()           -- poll combo points (cheap; no event-name guessing)
@@ -517,6 +518,7 @@ local defaults = {
   leftAction   = "INTERACTMOUSEOVER",
   leftStopsAutorun = true,         -- while autorunning, left-click stops it (Secure.lua)
   leftEnemy    = "interact",       -- left-click on enemies: interact | lock | lockattack
+  rogueOpeners = true,             -- rogue + lockattack: stealth click = pick pocket / ambush (shift: sap / garrote)
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in

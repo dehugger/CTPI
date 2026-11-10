@@ -25,6 +25,14 @@
   live enemy: lock / attack). Probed at login; falls back to the old
   behavior if the client's secure snippets don't work. `/ctpi why` shows
   which one is active.
+- **Context-aware enemy click** (lock + attack mode): the click is rewritten
+  out of combat to fit the situation. Rogues in stealth: Pick Pocket on a
+  humanoid you haven't robbed yet (Shift: Sap), otherwise Ambush (Shift:
+  Garrote); also Ambush / Garrote when stealthed in combat after Vanish.
+  Auto attack never fires while stealthed. The look-at label shows the
+  spells. Toggle under Behavior.
+- Enemy clicks now target exactly what's under the reticle first, then the
+  soft enemy.
 - **Interact key** (`/ctpi interactkey <KEY>`): an optional keyboard interact
   that also works in combat, when left-click is in lock mode.
 
