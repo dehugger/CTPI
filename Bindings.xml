@@ -5,4 +5,7 @@
     <Binding name="CTPI_FREECURSOR" category="ADDONS">
         CTPI_ToggleFreeCursor();
     </Binding>
+    <Binding name="CTPI_QUICKMENU" category="ADDONS">
+        CTPI_ToggleQuickMenu();
+    </Binding>
 </Bindings>

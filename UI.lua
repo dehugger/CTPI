@@ -716,6 +716,13 @@ local function showPanel()
   panel:Show()
 end
 
+-- refresh an open settings window (e.g. after a quick-menu toggle)
+function ns.ReloadConfigControls()
+  if not (panel and panel:IsShown()) then return end
+  for _, c in ipairs(controls) do if c.Reload then c:Reload() end end
+  for _, fn in ipairs(panel.repaints) do fn() end
+end
+
 function ns.ToggleConfig()
   ensurePanel()
   if panel:IsShown() then panel:Hide() else showPanel() end

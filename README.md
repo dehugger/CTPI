@@ -46,6 +46,8 @@ Author: **coffeeofdoom**
   to pick directly.
 - **Target tools.** Lock the looked-at mob as your hard target, set or clear
   focus, all from the keyboard.
+- **Quick toggles.** A minimap button (and minimap addon dropdown entry) with
+  a click-to-flip menu of the switches you change mid-play.
 
 ---
 
@@ -96,6 +98,8 @@ Optional keybinds under **Key Bindings > AddOns > Coffee's Touchpad Improvements
 - **Toggle CTPI (master)**: turn everything on or off
 - **Toggle free cursor (CTPI)**: free the cursor to click on UI. Also drives
   the shoulder camera's "Cursor key" mode.
+- **Toggle CTPI quick menu**: open the quick toggles (frees the cursor while
+  it's open). Also on the minimap button and `/ctpi menu`.
 
 ---
 
@@ -120,6 +124,8 @@ The settings window has five tabs and previews changes live while it's open.
 
 ```
 /ctpi                       open settings
+/ctpi menu                  quick toggles menu
+/ctpi minimap               show / hide the minimap button
 /ctpi toggle                master on/off
 /ctpi left <interact|run|autorun|none>
 /ctpi right <interact|run|autorun|none>

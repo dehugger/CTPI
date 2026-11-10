@@ -4,6 +4,7 @@ local addonName, ns = ...
 BINDING_HEADER_CTPI            = "Coffee's Touchpad Improvements"
 BINDING_NAME_CTPI_TOGGLE       = "Toggle CTPI (master)"
 BINDING_NAME_CTPI_FREECURSOR   = "Toggle free cursor (CTPI)"
+BINDING_NAME_CTPI_QUICKMENU    = "Toggle CTPI quick menu"
 
 -- =====================================================================
 -- Coffee's Touchpad Improvements (CTPI) / Core.lua
@@ -51,6 +52,7 @@ ns.blockFrames = {
   "BankPanel", "AccountBankPanel", "ContainerFrameCombinedBags",
   "AddonList",
   "CTPIConfigFrame",   -- our own config window
+  "CTPIQuickMenu",     -- and the quick toggles menu
 }
 
 -- IsVisible, not IsShown: modern UI has child panels (BankPanel etc) that
@@ -559,6 +561,10 @@ local defaults = {
   dialog = {
     keys = true,      -- quest / gossip by keyboard, camera stays locked (Dialog.lua)
   },
+  minimap = {
+    show  = true,     -- minimap button (quick toggles / settings)
+    angle = 215,      -- degrees around the minimap edge
+  },
   hud = {
     x = 0,            -- offset of the arcs + combo ring from the reticle
     y = 0,
@@ -821,6 +827,14 @@ SlashCmdList["CTPI"] = function(msg)
     if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end
     p("quest / gossip keys " .. (db.dialog.keys and "on" or "off"))
 
+  elseif cmd == "menu" or cmd == "quick" then
+    if ns.ToggleQuickMenu then ns.ToggleQuickMenu() end
+
+  elseif cmd == "minimap" then
+    db.minimap.show = not db.minimap.show
+    if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
+    p("minimap button " .. (db.minimap.show and "shown" or "hidden"))
+
   elseif cmd == "debug" then
     ns.debug = not ns.debug
     ns.lastWhy = false   -- force the next state to print
@@ -874,7 +888,7 @@ SlashCmdList["CTPI"] = function(msg)
     p("reset to defaults")
 
   else
-    p("|cFFFFFF00/ctpi|r opens settings. also: toggle, left/right <interact|run|autorun|none>, "
+    p("|cFFFFFF00/ctpi|r opens settings. also: menu (quick toggles), minimap, toggle, left/right <interact|run|autorun|none>, "
       .. "softenemy, softfriend, softinteract, focusunlock, "
       .. "lockkey/focuskey/clearfocuskey/interactkey <BIND|none>, shoulder [off|always|cursor|target], "
       .. "block/unblock <Frame>, why, debug, reset")

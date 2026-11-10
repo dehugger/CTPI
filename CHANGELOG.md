@@ -33,6 +33,13 @@
   spells. Toggle under Behavior.
 - Enemy clicks now target exactly what's under the reticle first, then the
   soft enemy.
+- **Quick toggles menu** (`QuickMenu.lua`): a compact click-to-flip list
+  of the common switches (enabled, free cursor, left-click on enemies, hard
+  lock, rogue openers, shoulder camera, label, HUD pieces, look to target,
+  focus unlock, debug). Open it from the new minimap button (left-click;
+  right-click opens all settings; drag to move), the minimap addon dropdown,
+  a keybind ("Toggle CTPI quick menu"), or `/ctpi menu`. `/ctpi minimap`
+  shows / hides the button.
 - **Hard lock** (Behavior, on by default): in combat with a live hostile
   target, left-click acts on that target instead of retargeting to whatever
   is under the reticle (corpses still loot), and right-click becomes

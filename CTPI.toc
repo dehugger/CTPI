@@ -4,6 +4,10 @@
 ## Author: coffeeofdoom
 ## Version: 2.2.1
 ## SavedVariables: CTPIDB
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
+## AddonCompartmentFunc: CTPI_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: CTPI_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: CTPI_OnAddonCompartmentLeave
 ## X-License: MIT
 ## X-Website: https://github.com/dehugger/CTPI
 
@@ -15,3 +19,4 @@ Look.lua
 HUD.lua
 Dialog.lua
 UI.lua
+QuickMenu.lua
