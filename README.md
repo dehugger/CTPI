@@ -177,8 +177,8 @@ The settings window has five tabs and previews changes live while it's open.
 ## Status
 
 Tested in game on Forever: loading, mouselook and cursor freeing, the settings
-window, the HUD arcs and combo ring, hold-to-run on the mouse buttons, and
-left-click lock + attack.
+window, the HUD arcs and combo ring, hold-to-run on the mouse buttons,
+left-click lock + attack, and the quick toggles menu.
 
 Not yet confirmed in game: quest/gossip keys, the shoulder camera, the
 autorun cancel, the click hint icons, and behavior with secret values in

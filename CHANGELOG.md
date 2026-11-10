@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.1 (unreleased, testing)
+## 2.3.0
 
 - **Minimize / tab-out detection fixed:** the old check needed FPS below 20,
   but the game's background cap is around 30, so it never fired. CTPI now

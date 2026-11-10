@@ -2,7 +2,7 @@
 ## Title: |cFFc8a25eCoffee's Touchpad Improvements|r
 ## Notes: Always-on mouselook, reticle targeting, and touchpad-friendly click/run for WoW Forever.
 ## Author: coffeeofdoom
-## Version: 2.2.1
+## Version: 2.3.0
 ## SavedVariables: CTPIDB
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## AddonCompartmentFunc: CTPI_OnAddonCompartmentClick
