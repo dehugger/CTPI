@@ -109,7 +109,7 @@ local function clickHint(token)
     -- context click: show what a click / shift-click will actually cast
     local function one(id)
       local icon = ns.SpellIcon(id)
-      local name = ns.SpellName(id)
+      local name = (type(id) == "number" and ns.SpellName(id)) or tostring(id)
       if style == "text" then return name:lower() end
       local t = icon and tex(icon, s) or ""
       if style == "icons" then t = t .. " " .. name end
@@ -129,6 +129,17 @@ local function clickHint(token)
       local p = atlas("NPE_LeftClick", s) .. tex(LOCK_ICON, s)
       if enemyMode == "lockattack" then p = p .. tex(ACTION_ICON.attack, s) end
       if style == "icons" then p = p .. " " .. word end
+      parts[#parts + 1] = p
+    end
+  elseif token == "softfriend" and ns.FriendClickSpell and ns.FriendClickSpell() and InCombatLockdown() then
+    -- healers: in combat, a click on a friendly casts your heal
+    local fs = ns.FriendClickSpell()
+    if style == "text" then
+      parts[#parts + 1] = "click: " .. fs:lower()
+    else
+      local icon = ns.SpellIcon(fs)
+      local p = atlas("NPE_LeftClick", s) .. (icon and tex(icon, s) or "")
+      if style == "icons" then p = p .. " " .. fs end
       parts[#parts + 1] = p
     end
   elseif act then
@@ -165,6 +176,7 @@ local function outline(fs)
 end
 
 local plate   -- optional dark backdrop behind the two lines
+local resetDrawn   -- defined further down; LayoutLook needs it first
 
 function ns.BuildLook()
   if label then return end
@@ -258,13 +270,14 @@ local lastDbg
 -- (SetText with inline icons is the expensive bit)
 local drawnName, drawnToken, drawnSig
 
-local function resetDrawn() drawnName, drawnToken, drawnSig = nil, nil, nil end
+resetDrawn = function() drawnName, drawnToken, drawnSig = nil, nil, nil end
 
 local function hintSig(token)
   local em = (token == "softenemy" and ns.EnemyClickMode) and ns.EnemyClickMode() or ""
   local btn = ns.InteractButtonLabel and ns.InteractButtonLabel() or ""
   local h = (token == "softenemy" and ns.EnemyClickHint) and ns.EnemyClickHint()
   local hs = h and (tostring(h.main) .. "/" .. tostring(h.shift)) or ""
+  if token == "softfriend" and InCombatLockdown() and ns.FriendClickSpell and ns.FriendClickSpell() then hs = hs .. "|F" end
   if token == "softenemy" and ns.HardLocked and ns.HardLocked() then hs = hs .. "|L" end
   return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn .. "|" .. hs
 end

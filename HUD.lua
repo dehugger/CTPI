@@ -104,6 +104,34 @@ local function gcdRemaining()
   return r > 0 and r or 0
 end
 
+-- caster support: your own cast fills the GCD arc (gold), a channel drains
+-- it (teal). returns value 0..1 and kind, or nil when not casting.
+local function plainNum(v) return (not ns.IsSecret(v)) and type(v) == "number" and v or nil end
+local function castState()
+  if not (ns.db and ns.db.gcd.cast) then return nil end
+  local now = GetTime() * 1000
+  if UnitCastingInfo then
+    local r = { UnitCastingInfo("player") }
+    local s, e = plainNum(r[4]), plainNum(r[5])
+    if (ns.IsSecret(r[1]) or r[1]) and s and e and e > s then
+      local v = (now - s) / (e - s)
+      return math.max(0, math.min(1, v)), "cast"
+    end
+  end
+  if UnitChannelInfo then
+    local r = { UnitChannelInfo("player") }
+    local s, e = plainNum(r[4]), plainNum(r[5])
+    if (ns.IsSecret(r[1]) or r[1]) and s and e and e > s then
+      local v = 1 - (now - s) / (e - s)
+      return math.max(0, math.min(1, v)), "channel"
+    end
+  end
+end
+
+local ARC_COLORS = {
+  gcd = { 0.88, 0.90, 1.00 }, cast = { 1.00, 0.82, 0.30 }, channel = { 0.40, 0.85, 1.00 },
+}
+
 function ns.BuildHUD()
   if hud then return end
   hud = CreateFrame("Frame", "CTPIHUD", UIParent)
@@ -135,10 +163,17 @@ function ns.BuildHUD()
   -- combat would otherwise re-set 30 bars every frame)
   gcdArc.last = -1
   gcdArc:SetScript("OnUpdate", function(self)
-    local rem = gcdRemaining()
-    if math.abs(rem - self.last) < 0.002 then return end
-    self.last = rem
-    for _, b in ipairs(self.dots) do b:SetValue(rem) end
+    local v, kind = castState()
+    if not v then v, kind = gcdRemaining(), "gcd" end
+    if kind ~= self.kind then
+      self.kind = kind
+      local c = ARC_COLORS[kind]
+      for _, b in ipairs(self.dots) do b:SetStatusBarColor(c[1], c[2], c[3], 0.95) end
+      self.last = -1
+    end
+    if math.abs(v - self.last) < 0.002 then return end
+    self.last = v
+    for _, b in ipairs(self.dots) do b:SetValue(v) end
   end)
   gcdArc:Hide()
 
@@ -268,7 +303,7 @@ local function updateGCDVisibility()
   local useArc   = G.show and style == "arc" and not gcdSecret
   local useSwipe = G.show and not useArc
   if useSwipe then swipe:Show() else swipe:Hide() end
-  if useArc and (gcdRemaining() > 0 or (G.track and InCombatLockdown()) or previewing) then
+  if useArc and (gcdRemaining() > 0 or castState() or (G.track and InCombatLockdown()) or previewing) then
     gcdArc:Show()
   else
     gcdArc:Hide()

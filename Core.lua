@@ -53,6 +53,7 @@ ns.blockFrames = {
   "AddonList",
   "CTPIConfigFrame",   -- our own config window
   "CTPIQuickMenu",     -- and the quick toggles menu
+  "CTPISetupFrame",    -- and the setup wizard
 }
 
 -- IsVisible, not IsShown: modern UI has child panels (BankPanel etc) that
@@ -164,6 +165,7 @@ ns.SuppressFocusFor = function(sec) suppressUntil = GetTime() + (sec or 3) end
 local function shouldFreeCursor()
   local db = ns.db
   if not db.enabled then return true, "master toggle is off" end
+  if ns.RadialOpen and ns.RadialOpen() then return true, "radial menu open" end
   if ns.freeCursorHeld then return true, "free-cursor key is toggled" end
   if focusLost then return true, "window in background / minimized (fps heuristic)" end
   if ns.SpellTargeting() then return true, "placing a ground spell" end
@@ -438,6 +440,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
   local looking = IsMouselooking()
   if ns.TickClickAim then ns.TickClickAim() end      -- Secure.lua: left-click lock vs interact
   if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end   -- context click (no-op in combat / if unchanged)
+  if ns.TickRadial then ns.TickRadial() end               -- radial: don't pop while typing
   if ns.UpdateLook then ns.UpdateLook(looking) end   -- Look.lua
   if ns.UpdateHUD then ns.UpdateHUD(looking) end     -- HUD.lua
   updateCombo()           -- poll combo points (cheap; no event-name guessing)
@@ -547,6 +550,7 @@ local defaults = {
     style = "arc",      -- "arc" (dotted arc, see HUD.lua) | "swipe" (round swipe on the reticle)
     side  = "opposite", -- arc side: "opposite" (of the resource arc) | left | right | below | above
     track = true,       -- arc: keep the empty track visible in combat
+    cast  = true,       -- arc: show your casts (fill, gold) and channels (drain, teal)
     size  = 28,         -- swipe size
     alpha = 0.30,       -- swipe opacity
   },
@@ -560,6 +564,12 @@ local defaults = {
   },
   dialog = {
     keys = true,      -- quest / gossip by keyboard, camera stays locked (Dialog.lua)
+  },
+  radial = {
+    enabled = true,   -- hold the modifier for a ring of spells (Radial.lua)
+    mod     = "shift", -- "shift" | "ctrl" | "alt"
+    radius  = 110,
+    size    = 44,
   },
   minimap = {
     show  = true,     -- minimap button (quick toggles / settings)
@@ -728,6 +738,8 @@ SlashCmdList["CTPI"] = function(msg)
     db.enabled = not db.enabled
     ns.ForceReconcile()
     ns.ApplyBackgroundCap()
+    if ns.ApplyFreelookCentering then ns.ApplyFreelookCentering() end
+    if ns.RebuildRadial then ns.RebuildRadial() end
     if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end
     if ns.UpdateShoulder then ns.UpdateShoulder() end
     p("master " .. (db.enabled and "|cFF00FF00on|r" or "|cFFFF0000off|r"))
@@ -827,6 +839,16 @@ SlashCmdList["CTPI"] = function(msg)
     if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end
     p("quest / gossip keys " .. (db.dialog.keys and "on" or "off"))
 
+  elseif cmd == "radial" then
+    db.radial.enabled = not db.radial.enabled
+    if ns.ApplyFreelookCentering then ns.ApplyFreelookCentering() end
+    if ns.RebuildRadial then ns.RebuildRadial() end
+    p("radial menu " .. (db.radial.enabled and "on" or "off")
+      .. (InCombatLockdown() and " |cFF888888(applies after combat)|r" or ""))
+
+  elseif cmd == "setup" then
+    if ns.OpenSetup then ns.OpenSetup() end
+
   elseif cmd == "menu" or cmd == "quick" then
     if ns.ToggleQuickMenu then ns.ToggleQuickMenu() end
 
@@ -848,9 +870,14 @@ SlashCmdList["CTPI"] = function(msg)
       p("enabled=" .. tostring(db.enabled) .. "  mouselooking=" .. tostring(IsMouselooking()))
       p("cursor should be free? " .. (free and ("|cFFFF8800yes|r -> " .. why)
         or "|cFF00FF00no|r (should be mouselooking)"))
-      if (db.leftEnemy or "interact") ~= "interact" then
-        p("left-click on enemies: " .. db.leftEnemy .. ", loot in combat: "
-          .. (ns.secureAimOK and "|cFF00FF00on (secure aim)|r" or "|cFFFF8800off (secure snippets unavailable)|r"))
+      p("left-click on enemies: " .. tostring(db.leftEnemy) .. "; in-combat click switching (loot / unlock / heal): "
+        .. (ns.secureAimOK and "|cFF00FF00working|r" or "|cFFFF8800unavailable on this client (fallback)|r"))
+      local _, cls = UnitClass("player")
+      local st, how = ns.PlayerStealthed()
+      p("class " .. tostring(cls) .. ", stealthed: " .. tostring(st) .. " (" .. how .. ")"
+        .. ", form/stance: " .. tostring(GetShapeshiftForm and GetShapeshiftForm()))
+      if ns.EnemyMacroText and ns.EnemyMacroText() then
+        p("enemy click macro: |cFFAAAAAA" .. ns.EnemyMacroText():gsub("\n", " || ") .. "|r")
       end
       local kf = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
       if kf then p("keyboard focus: " .. tostring(kf.GetName and kf:GetName() or "unnamed frame")) end
@@ -888,7 +915,7 @@ SlashCmdList["CTPI"] = function(msg)
     p("reset to defaults")
 
   else
-    p("|cFFFFFF00/ctpi|r opens settings. also: menu (quick toggles), minimap, toggle, left/right <interact|run|autorun|none>, "
+    p("|cFFFFFF00/ctpi|r opens settings. also: setup, menu (quick toggles), radial, minimap, toggle, left/right <interact|run|autorun|none>, "
       .. "softenemy, softfriend, softinteract, focusunlock, "
       .. "lockkey/focuskey/clearfocuskey/interactkey <BIND|none>, shoulder [off|always|cursor|target], "
       .. "block/unblock <Frame>, why, debug, reset")

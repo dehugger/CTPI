@@ -94,6 +94,19 @@ enemyBtn:SetAttribute("type", "macro")
 local lockedBtn = CreateFrame("Button", "CTPIEnemyLockedButton", UIParent, "SecureActionButtonTemplate")
 lockedBtn:RegisterForClicks("AnyUp", "AnyDown")
 lockedBtn:SetAttribute("type", "macro")
+-- in-combat friendly click (healers): cast the class's friendSpell on the
+-- friendly under the reticle (or the soft friend)
+local friendBtn = CreateFrame("Button", "CTPIFriendClickButton", UIParent, "SecureActionButtonTemplate")
+friendBtn:RegisterForClicks("AnyUp", "AnyDown")
+friendBtn:SetAttribute("type", "macro")
+local currentFriend
+
+-- the friend-click spell when that option is on, else nil
+function ns.FriendClickSpell()
+  local cfg = ns.ClassConfig and ns.ClassConfig()
+  if cfg and cfg.friendClick and cfg.friendSpell and cfg.friendSpell ~= "" then return cfg.friendSpell end
+end
+
 local unlockBtn = CreateFrame("Button", "CTPIUnlockButton", UIParent, "SecureActionButtonTemplate")
 unlockBtn:RegisterForClicks("AnyUp", "AnyDown")
 unlockBtn:SetAttribute("type", "macro")
@@ -141,7 +154,9 @@ end
 
 -- target what's exactly under the reticle first, then the soft enemy
 local TARGET_LINE = "/target [@mouseover,harm,nodead] mouseover; [@softenemy,harm,nodead] softenemy"
-local ATTACK_LINE = "/startattack [nostealth,@target,harm,nodead]"
+-- rogues: Classic-style clients report stealth as stance 1, so check both
+-- (the attack line itself lives in Profiles.lua: ns.AttackLine)
+local ROGUE_STEALTH = "[stealth][stance:1]"
 
 local function aimUnit()
   local mo = UnitExists("mouseover")
@@ -160,19 +175,17 @@ local function isHumanoid(u)
   return name == "Humanoid"
 end
 
--- returns macrotext, hint ({ main = spellID, shift = spellID } or nil)
+-- returns macrotext, hint ({ main = spellID|name, shift = spellID|name } or nil)
+-- the per-class action part comes from Profiles.lua (ns.EnemyActionLines)
 local function enemyPlan(forCombat)
   local db = ns.db
   if not db or db.leftEnemy ~= "lockattack" then return TARGET_LINE, nil end
-  local _, class = UnitClass("player")
-  if class == "HUNTER" then
-    return TARGET_LINE .. "\n/cast [@target,harm,nodead] !" .. spellName(SPELL.AUTOSHOT),
-           { main = SPELL.AUTOSHOT }
-  end
+  local class = ns.PlayerClass()
+  local action, hint = ns.EnemyActionLines()
   if class == "ROGUE" and db.rogueOpeners then
-    local opener = "/cast [stealth,mod:shift] " .. spellName(SPELL.GARROTE)
-      .. "; [stealth] " .. spellName(SPELL.AMBUSH)
-    if not forCombat and IsStealthed() and not InCombatLockdown() then
+    local opener = "/cast [stealth,mod:shift][stance:1,mod:shift] " .. spellName(SPELL.GARROTE)
+      .. "; " .. ROGUE_STEALTH .. " " .. spellName(SPELL.AMBUSH)
+    if not forCombat and ns.PlayerStealthed() and not InCombatLockdown() then
       local u = aimUnit()
       local g = u and UnitGUID(u)
       local robbed = g and not ns.IsSecret(g) and picked[g]
@@ -182,9 +195,9 @@ local function enemyPlan(forCombat)
       end
       return TARGET_LINE .. "\n" .. opener, { main = SPELL.AMBUSH, shift = SPELL.GARROTE }
     end
-    return TARGET_LINE .. "\n" .. opener .. "\n" .. ATTACK_LINE, nil
+    return TARGET_LINE .. "\n" .. opener .. "\n" .. action, hint
   end
-  return TARGET_LINE .. "\n" .. ATTACK_LINE, nil
+  return TARGET_LINE .. "\n" .. action, hint
 end
 
 local currentMacro, currentLocked, currentHint
@@ -202,6 +215,12 @@ function ns.UpdateEnemyMacro(forCombat)
   if text ~= currentMacro then
     enemyBtn:SetAttribute("macrotext", text)
     currentMacro = text
+  end
+  local fs = ns.FriendClickSpell()
+  local ftext = fs and ("/cast [@mouseover,help,nodead][@softfriend,help,nodead][] " .. fs) or "/stopmacro"
+  if ftext ~= currentFriend then
+    friendBtn:SetAttribute("macrotext", ftext)
+    currentFriend = ftext
   end
   local locked = text:match("^/target[^\n]*\n(.*)$") or "/stopmacro"
   if locked ~= currentLocked then
@@ -222,6 +241,7 @@ end
 
 -- for the look-at label: what a click / shift-click on an enemy will cast
 function ns.EnemyClickHint() return currentHint end
+function ns.EnemyMacroText() return currentMacro end
 function ns.SpellIcon(id)
   local t = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
   if ns.IsSecret(t) then return nil end
@@ -293,7 +313,7 @@ end
 -- Forever's early builds had broken secure snippets, so this is probed at
 -- login (ns.secureAimOK) and the insecure path below is the fallback.
 -- ---------------------------------------------------------------------
-local AIM_DRIVER = "[@mouseover,dead] interact; [@mouseover,help] interact; "
+local AIM_DRIVER = "[@mouseover,dead] interact; [combat,@mouseover,help] friend; [@mouseover,help] interact; "
   .. "[@mouseover,noharm,exists] interact; "
   .. "[combat,@target,harm,nodead] locked; "
   .. "[@mouseover,harm] enemy; "
@@ -311,6 +331,8 @@ header:SetAttribute("apply", [[
   end
   local hard = self:GetAttribute("ctpi-hardlock")
   if st == "locked" and not hard then st = "enemy" end
+  if (st == "enemy" or st == "locked") and not self:GetAttribute("ctpi-enemy") then st = "interact" end
+  if st == "friend" and not self:GetAttribute("ctpi-friend") then st = "interact" end
   -- BUTTON1
   if self:GetAttribute("ctpi-autorun") then
     self:SetBinding(true, "BUTTON1", "MOVEFORWARD")
@@ -318,6 +340,8 @@ header:SetAttribute("apply", [[
     self:SetBindingClick(true, "BUTTON1", "CTPIEnemyLockedButton")
   elseif st == "enemy" then
     self:SetBindingClick(true, "BUTTON1", "CTPIEnemyClickButton")
+  elseif st == "friend" then
+    self:SetBindingClick(true, "BUTTON1", "CTPIFriendClickButton")
   else
     self:SetBinding(true, "BUTTON1", "INTERACTMOUSEOVER")
   end
@@ -334,7 +358,7 @@ header:SetAttribute("apply", [[
 header:SetAttribute("_onstate-aim", [[ self:RunAttribute("apply", newstate) ]])
 
 ns.secureAimOK = false
-local driverOn, hOff, hAuto, hRight, hHard = false, nil, nil, nil, nil
+local driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
 
 function ns.ProbeSecureAim()
   if InCombatLockdown() then return end
@@ -346,11 +370,12 @@ function ns.ProbeSecureAim()
   end
 end
 
--- header mode = lock/attack option is on and the secure path works
+-- header mode = a lock/attack option or the friendly click is on, and the
+-- secure path works
 local function useHeader()
   local db = ns.db
   return ns.secureAimOK and db and db.leftAction == "INTERACTMOUSEOVER"
-    and (db.leftEnemy or "interact") ~= "interact"
+    and ((db.leftEnemy or "interact") ~= "interact" or ns.FriendClickSpell() ~= nil)
 end
 ns.AimHeaderActive = function() return useHeader() and driverOn end
 
@@ -362,8 +387,13 @@ local function headerSync(off, autorun)
   off, autorun = off and true or nil, autorun and true or nil
   local right = (db and CLICK_ACTIONS[db.rightAction]) and db.rightAction or nil
   local hard = (db and db.hardLock) and true or nil
-  if fresh or off ~= hOff or autorun ~= hAuto or right ~= hRight or hard ~= hHard then
-    hOff, hAuto, hRight, hHard = off, autorun, right, hard
+  local enemy = (db and (db.leftEnemy or "interact") ~= "interact") and true or nil
+  local friend = ns.FriendClickSpell() and true or nil
+  if fresh or off ~= hOff or autorun ~= hAuto or right ~= hRight or hard ~= hHard
+     or enemy ~= hEnemy or friend ~= hFriend then
+    hOff, hAuto, hRight, hHard, hEnemy, hFriend = off, autorun, right, hard, enemy, friend
+    header:SetAttribute("ctpi-enemy", enemy)
+    header:SetAttribute("ctpi-friend", friend)
     header:SetAttribute("ctpi-off", off)
     header:SetAttribute("ctpi-autorun", autorun)
     header:SetAttribute("ctpi-right", right)
@@ -375,7 +405,7 @@ end
 local function headerStop()
   if InCombatLockdown() or not driverOn then return end
   UnregisterStateDriver(header, "aim")
-  driverOn, hOff, hAuto, hRight, hHard = false, nil, nil, nil, nil
+  driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
   ClearOverrideBindings(header)
 end
 

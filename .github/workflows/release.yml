@@ -1,0 +1,26 @@
+# Builds the addon zip (folder named CTPI) and publishes it when a version
+# tag (v*) is pushed. Uploads to CurseForge once:
+#   1. the CurseForge project exists and its ID is in CTPI.toc as
+#      "## X-Curse-Project-ID: <id>"
+#   2. a CurseForge API token is saved as the repo secret CF_API_KEY
+# Without those it still creates the GitHub release with the zip.
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: BigWigsMods/packager@v2

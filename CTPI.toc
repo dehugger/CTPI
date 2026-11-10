@@ -1,22 +1,26 @@
 ## Interface: 16001
 ## Title: |cFFc8a25eCoffee's Touchpad Improvements|r
-## Notes: Always-on mouselook, reticle targeting, and touchpad-friendly click/run for WoW Forever.
+## Notes: Play on a trackpad: always-on mouselook, click to lock and attack, a Shift radial spell menu, and a HUD at the aim point.
 ## Author: coffeeofdoom
-## Version: 2.3.0
+## Version: 3.0.0
 ## SavedVariables: CTPIDB
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## AddonCompartmentFunc: CTPI_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: CTPI_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: CTPI_OnAddonCompartmentLeave
+## Category: Combat
 ## X-License: MIT
 ## X-Website: https://github.com/dehugger/CTPI
 
 Compat.lua
+Profiles.lua
 Core.lua
 Secure.lua
 Camera.lua
 Look.lua
 HUD.lua
 Dialog.lua
+Radial.lua
 UI.lua
 QuickMenu.lua
+Setup.lua

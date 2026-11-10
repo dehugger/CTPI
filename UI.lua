@@ -133,6 +133,32 @@ local function makeButton(parent, label, w, onClick)
   return b
 end
 
+-- label + text box, committed on Enter / focus loss
+local GOLD_TEXT = "|cFFc8a25e"
+local function makeEditRow(parent, label, boxW, getVal, setVal, labelW)
+  local row = CreateFrame("Frame", nil, parent)
+  labelW = labelW or 74
+  row:SetSize(labelW + boxW + 12, 22)
+  local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  lbl:SetPoint("LEFT", row, "LEFT", 0, 0)
+  lbl:SetWidth(labelW); lbl:SetJustifyH("LEFT")
+  lbl:SetText(label)
+  local box = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+  box:SetSize(boxW, 18)
+  box:SetPoint("LEFT", lbl, "RIGHT", 6, 0)
+  box:SetAutoFocus(false)
+  local function commit()
+    local v = (box:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if v ~= (getVal() or "") then setVal(v) end
+  end
+  box:SetScript("OnEnterPressed", function(self) commit(); self:ClearFocus() end)
+  box:SetScript("OnEditFocusLost", commit)
+  box:SetScript("OnEscapePressed", function(self) self:SetText(getVal() or ""); self:ClearFocus() end)
+  row.Reload = function() box:SetText(getVal() or ""); box:SetCursorPosition(0) end
+  row.Reload()
+  return row
+end
+
 local function makeChoiceRow(parent, choices, getVal, setVal)
   local btns = {}
   local function repaint()
@@ -174,6 +200,12 @@ local function openColorPicker(r, g, b, onChange)
     ColorPickerFrame:Hide(); ColorPickerFrame:Show()
   end
 end
+
+-- shared with Setup.lua (the setup wizard builds with the same widgets)
+ns.UIKit = {
+  makeCheck = makeCheck, makeButton = makeButton, makeChoiceRow = makeChoiceRow,
+  makeEditRow = makeEditRow, makeSliderRow = makeSliderRow,
+}
 
 -- ---- layout helpers ---------------------------------------------------------
 local function sectionHeader(parent, text, anchor, gap)
@@ -374,9 +406,13 @@ local function buildHUDPage(page)
     function() return G.track end, function(v) G.track = v; hud() end)
   cTrack:SetPoint("TOPLEFT", gSideBtns[1], "BOTTOMLEFT", -4, -8)
   controls[#controls+1] = cTrack
+  local cCast = makeCheck(page, "Arc: show your casts and channels too",
+    function() return G.cast end, function(v) G.cast = v; hud() end)
+  cCast:SetPoint("LEFT", cTrack, "LEFT", 0, -24)
+  controls[#controls+1] = cCast
   local gSize = makeSliderRow(page, "Swipe size", 12, 64, 1, nil,
     function() return G.size end, function(v) G.size = v; hud() end)
-  gSize:SetPoint("TOPLEFT", cTrack, "BOTTOMLEFT", 4, -4)
+  gSize:SetPoint("TOPLEFT", cCast, "BOTTOMLEFT", 4, -4)
   controls[#controls+1] = gSize
   local gAlpha = makeSliderRow(page, "Swipe alpha", 0.05, 1, 0.05, 2,
     function() return G.alpha end, function(v) G.alpha = v; hud() end)
@@ -437,6 +473,162 @@ local function buildHUDPage(page)
     function() return db.hud.gap end, function(v) db.hud.gap = v; hud() end)
   hGap:SetPoint("TOPLEFT", hY, "BOTTOMLEFT", 0, -6)
   controls[#controls+1] = hGap
+end
+
+-- ===== CLASS =================================================================
+-- per-class click setup and the Shift radial rings (Profiles.lua / Radial.lua)
+local function rebuildClass()
+  if ns.UpdateEnemyMacro then ns.UpdateEnemyMacro() end
+  if ns.RefreshBindings then ns.RefreshBindings() end
+  if ns.RebuildRadial then ns.RebuildRadial() end
+end
+
+local function buildClassPage(page)
+  local db = ns.db
+  local function cfg() return ns.ClassConfig() end
+  local className = (UnitClass("player")) or ns.PlayerClass()
+
+  local hCls = sectionHeader(page, "Clicking as " .. className, pageTop(page), 0)
+
+  local actLbl = smallLabel(page, "Left-click on enemies, in Lock + attack mode:", hCls, 0, -6)
+  local actBtns, actRepaint = makeChoiceRow(page,
+    { { label = "Auto attack", value = "melee", w = 82 },
+      { label = "Auto Shot", value = "autoshot", w = 74 },
+      { label = "Cast spell", value = "spell", w = 76 },
+      { label = "Druid", value = "druid", w = 56 } },
+    function() return cfg().enemyAction end,
+    function(v) cfg().enemyAction = v; rebuildClass() end)
+  actBtns[1]:SetPoint("TOPLEFT", actLbl, "BOTTOMLEFT", 0, -6)
+  repaints[#repaints+1] = actRepaint
+
+  local spellRow = makeEditRow(page, "Spell", 200,
+    function() return cfg().enemySpell end,
+    function(v) cfg().enemySpell = v; rebuildClass() end)
+  spellRow:SetPoint("TOPLEFT", actBtns[1], "BOTTOMLEFT", 0, -8)
+  controls[#controls+1] = spellRow
+
+  local cFriend = makeCheck(page, "In combat, left-click a friendly to cast:",
+    function() return cfg().friendClick end,
+    function(v) cfg().friendClick = v; rebuildClass() end)
+  cFriend:SetPoint("TOPLEFT", spellRow, "BOTTOMLEFT", -4, -6)
+  controls[#controls+1] = cFriend
+  local friendRow = makeEditRow(page, "Heal", 200,
+    function() return cfg().friendSpell end,
+    function(v) cfg().friendSpell = v; rebuildClass() end)
+  friendRow:SetPoint("TOPLEFT", cFriend, "BOTTOMLEFT", 4, -2)
+  controls[#controls+1] = friendRow
+
+  -- ---- radial ----
+  local hRad = sectionHeader(page, "Radial menu (hold the modifier)", friendRow, -14)
+  local cRad = makeCheck(page, "Enabled",
+    function() return db.radial.enabled end,
+    function(v)
+      db.radial.enabled = v
+      if ns.ApplyFreelookCentering then ns.ApplyFreelookCentering() end
+      rebuildClass()
+    end)
+  cRad:SetPoint("TOPLEFT", hRad, "BOTTOMLEFT", -4, -4)
+  controls[#controls+1] = cRad
+  local modBtns, modRepaint = makeChoiceRow(page,
+    { { label = "Shift", value = "shift", w = 54 }, { label = "Ctrl", value = "ctrl", w = 50 },
+      { label = "Alt", value = "alt", w = 44 } },
+    function() return db.radial.mod end,
+    function(v) db.radial.mod = v; rebuildClass() end)
+  modBtns[1]:SetPoint("LEFT", cRad, "RIGHT", 70, 0)
+  repaints[#repaints+1] = modRepaint
+  local rRad = makeSliderRow(page, "Ring size", 60, 220, 1, nil,
+    function() return db.radial.radius end, function(v) db.radial.radius = v; rebuildClass() end)
+  rRad:SetPoint("TOPLEFT", cRad, "BOTTOMLEFT", 4, -4)
+  controls[#controls+1] = rRad
+
+  -- ring picker: < name >  (rings are per class, first matching wins,
+  -- blank condition = default)
+  local idx = 1
+  local function rings() return cfg().rings end
+  local function cur()
+    local r = rings()
+    if idx > #r then idx = math.max(1, #r) end
+    return r[idx]
+  end
+
+  local nav = CreateFrame("Frame", nil, page)
+  nav:SetSize(308, 24)
+  nav:SetPoint("TOPLEFT", rRad, "BOTTOMLEFT", 0, -8)
+  local prevB = makeButton(nav, "<", 26, nil)
+  prevB:SetPoint("LEFT", nav, "LEFT", 0, 0)
+  local ringLbl = nav:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  ringLbl:SetPoint("LEFT", prevB, "RIGHT", 8, 0)
+  ringLbl:SetWidth(150); ringLbl:SetJustifyH("LEFT")
+  local nextB = makeButton(nav, ">", 26, nil)
+  nextB:SetPoint("LEFT", ringLbl, "RIGHT", 4, 0)
+
+  local nameRow = makeEditRow(page, "Ring name", 150,
+    function() return cur() and cur().name or "" end,
+    function(v) if cur() then cur().name = v; rebuildClass() end end)
+  nameRow:SetPoint("TOPLEFT", nav, "BOTTOMLEFT", 0, -6)
+  local condRow = makeEditRow(page, "Condition", 150,
+    function() return cur() and cur().cond or "" end,
+    function(v) if cur() then cur().cond = v; rebuildClass() end end)
+  condRow:SetPoint("TOPLEFT", nameRow, "BOTTOMLEFT", 0, -4)
+
+  local slotRows = {}
+  for j = 1, 8 do
+    local row = makeEditRow(page, tostring(j), 120,
+      function() local r = cur(); return r and r.slots[j] or "" end,
+      function(v) local r = cur(); if r then r.slots[j] = v; rebuildClass() end end, 14)
+    if j == 1 then row:SetPoint("TOPLEFT", condRow, "BOTTOMLEFT", 0, -8)
+    elseif j == 5 then row:SetPoint("TOPLEFT", slotRows[1], "TOPLEFT", 160, 0)
+    else row:SetPoint("TOPLEFT", slotRows[j - 1], "BOTTOMLEFT", 0, -2) end
+    slotRows[j] = row
+  end
+
+  local function showRing()
+    local r = cur()
+    local n = #rings()
+    ringLbl:SetText(r and (GOLD_TEXT .. (r.name ~= "" and r.name or "(unnamed)") .. "|r  "
+      .. idx .. "/" .. n) or "no rings")
+    nameRow:Reload(); condRow:Reload()
+    for _, row in ipairs(slotRows) do row:Reload() end
+  end
+  prevB:SetScript("OnClick", function() local n = #rings(); idx = (idx - 2) % math.max(n, 1) + 1; showRing() end)
+  nextB:SetScript("OnClick", function() local n = #rings(); idx = idx % math.max(n, 1) + 1; showRing() end)
+
+  local addB = makeButton(page, "Add ring", 80, function()
+    local r = rings()
+    if #r >= 6 then return end
+    table.insert(r, 1, { name = "New ring", cond = "[combat]", slots = {} })
+    idx = 1; rebuildClass(); showRing()
+  end)
+  addB:SetPoint("TOPLEFT", slotRows[4], "BOTTOMLEFT", 0, -8)
+  local delB = makeButton(page, "Delete ring", 90, function()
+    local r = rings()
+    if #r == 0 then return end
+    table.remove(r, idx); rebuildClass(); showRing()
+  end)
+  delB:SetPoint("LEFT", addB, "RIGHT", 6, 0)
+  local resetB = makeButton(page, "Class defaults", 108, function()
+    if InCombatLockdown() then return end
+    ns.ResetClassConfig(); idx = 1; rebuildClass()
+    for _, c in ipairs(controls) do if c.Reload then c:Reload() end end
+    for _, fn in ipairs(repaints) do fn() end
+    showRing()
+  end)
+  resetB:SetPoint("LEFT", delB, "RIGHT", 6, 0)
+
+  local help = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  help:SetPoint("TOPLEFT", addB, "BOTTOMLEFT", 0, -8)
+  help:SetPoint("RIGHT", page, "RIGHT", 0, 0)
+  help:SetJustifyH("LEFT"); help:SetWordWrap(true)
+  help.Reload = function(self)
+    self:SetText("Slots: a spell name, or a full /macro line. Unknown spells are skipped. "
+      .. "Condition: macro conditions like [stealth], [combat], [{cat}], [{bear}], "
+      .. "[{moonkin}], or blank for the default ring. The first matching ring opens. "
+      .. "Your current form / stance: " .. tostring(ns.CurrentFormIndex and ns.CurrentFormIndex() or 0) .. ".")
+  end
+  help:Reload()
+  controls[#controls+1] = help
+  repaints[#repaints+1] = showRing
+  showRing()
 end
 
 -- ===== CAMERA ================================================================
@@ -628,7 +820,7 @@ end
 
 local function buildPanel()
   panel = CreateFrame("Frame", "CTPIConfigFrame", UIParent, "BackdropTemplate")
-  panel:SetSize(360, 770)
+  panel:SetSize(400, 770)
   -- default off to the left so the centered reticle stays visible
   panel:SetPoint("LEFT", UIParent, "LEFT", 40, 0)
   panel:SetBackdrop({
@@ -669,11 +861,12 @@ local function buildPanel()
 
   -- tabs
   local TABS = {
-    { key = "reticle",  label = "Reticle",  w = 66, build = buildReticlePage },
-    { key = "label",    label = "Label",    w = 56, build = buildLabelPage },
-    { key = "hud",      label = "HUD",      w = 50, build = buildHUDPage },
-    { key = "camera",   label = "Camera",   w = 66, build = buildCameraPage },
-    { key = "behavior", label = "Behavior", w = 76, build = buildBehaviorPage },
+    { key = "reticle",  label = "Reticle",  w = 60, build = buildReticlePage },
+    { key = "label",    label = "Label",    w = 52, build = buildLabelPage },
+    { key = "hud",      label = "HUD",      w = 46, build = buildHUDPage },
+    { key = "camera",   label = "Camera",   w = 62, build = buildCameraPage },
+    { key = "behavior", label = "Behavior", w = 72, build = buildBehaviorPage },
+    { key = "class",    label = "Class",    w = 54, build = buildClassPage },
   }
   local prev
   for _, t in ipairs(TABS) do

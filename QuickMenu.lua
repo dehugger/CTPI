@@ -69,6 +69,11 @@ local ROWS = {
   { label = "Rogue stealth openers", path = "rogueOpeners", after = rebind },
   { label = "Left-click stops autorun", path = "leftStopsAutorun",
     after = function() if ns.SyncAutorunSwap then ns.SyncAutorunSwap() end end },
+  { label = "Shift radial menu", path = "radial.enabled", combat = true,
+    after = function()
+      if ns.ApplyFreelookCentering then ns.ApplyFreelookCentering() end
+      if ns.RebuildRadial then ns.RebuildRadial() end
+    end },
   { label = "Quest / gossip keys", path = "dialog.keys",
     after = function() if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end end },
 
@@ -81,6 +86,7 @@ local ROWS = {
   { label = "Reticle", path = "reticle.show",
     after = function() if ns.RefreshReticle then ns.RefreshReticle() end; ns.ForceReconcile() end },
   { label = "GCD", path = "gcd.show", after = hud },
+  { label = "Casts on the GCD arc", path = "gcd.cast", after = hud },
   { label = "Resource arc", path = "power.show", after = hud },
   { label = "Combo points", path = "combo.show",
     after = function() if ns.UpdateCombo then ns.UpdateCombo() end end },
@@ -203,12 +209,20 @@ local function build()
   end
 
   local all = CreateFrame("Button", nil, menu, "UIPanelButtonTemplate")
-  all:SetSize(WIDTH - 24, 22)
+  all:SetSize((WIDTH - 30) / 2, 22)
   all:SetPoint("TOPLEFT", menu, "TOPLEFT", 12, y - 8)
   all:SetText("All settings")
   all:SetScript("OnClick", function()
     menu:Hide()
     if ns.OpenConfig then ns.OpenConfig() end
+  end)
+  local setup = CreateFrame("Button", nil, menu, "UIPanelButtonTemplate")
+  setup:SetSize((WIDTH - 30) / 2, 22)
+  setup:SetPoint("LEFT", all, "RIGHT", 6, 0)
+  setup:SetText("Run setup")
+  setup:SetScript("OnClick", function()
+    menu:Hide()
+    if ns.OpenSetup then ns.OpenSetup() end
   end)
   y = y - 8 - 22
 

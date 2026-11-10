@@ -1,5 +1,38 @@
 # Changelog
 
+## 3.0.0
+
+**New**
+- **Radial menu:** hold Shift (or Ctrl / Alt) for a ring of spells around the
+  aim point; the camera lets go, the cursor appears in the middle, click a
+  spell. Works in combat. Rings are per class and switch by context, e.g.
+  stealth vs combat for rogues and one per form for druids. Edit them on the
+  new **Class** tab (spell names or full /macro lines, macro conditions plus
+  `{cat}` / `{bear}` / `{moonkin}` / `{travel}` form tokens).
+- **Class profiles:** what a lock + attack click does is now per class: auto
+  attack, Auto Shot, a spell of your choice (casters), or druid by form
+  (cast in caster / moonkin, attack in cat / bear).
+- **Healer click:** optionally, in combat, left-clicking a friendly casts your
+  heal (Class tab).
+- **Casts on the GCD arc:** your casts fill it (gold) and channels drain it
+  (teal).
+- **Guided setup:** a six-step setup on first login (and once after this
+  update): recommended game settings, play style, mouse buttons, camera and
+  HUD, and keybinds you set by pressing them. `/ctpi setup` reruns it.
+- The quick menu gets radial, cast arc and "Run setup" entries.
+
+**Fixed**
+- Rogue stealth click didn't switch to Pick Pocket / Ambush: stealth is now
+  detected several ways (including Classic-style stealth stances), and
+  `/ctpi why` shows what CTPI sees.
+- A startup error (the look-at label's layout ran before a helper existed)
+  silently stopped part of the login setup: the target lock / focus keys
+  weren't bound until after your first fight.
+
+**For CurseForge**
+- `.pkgmeta` for the BigWigs packager; TOC category and notes.
+- README rewritten as the project description.
+
 ## 2.3.0
 
 - **Minimize / tab-out detection fixed:** the old check needed FPS below 20,

@@ -54,6 +54,32 @@ function ns.SpellTargeting()
   return (SpellIsTargeting and SpellIsTargeting()) and true or false
 end
 
+-- "am I stealthed?" asked every way we know. Forever might report rogue
+-- stealth like retail (IsStealthed) or like Classic (a stance / form), so
+-- any of these counts. Returns stealthed, how (for /ctpi why).
+local STEALTH_AURAS = { 1784, 1785, 1786, 1787, 115191, 5215, 1856, 11327 } -- stealth, prowl, vanish
+function ns.PlayerStealthed()
+  if IsStealthed and IsStealthed() then return true, "IsStealthed" end
+  if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+    for _, id in ipairs(STEALTH_AURAS) do
+      local ok, a = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+      if ok and a and not ns.IsSecret(a) then return true, "aura " .. id end
+    end
+  end
+  if AuraUtil and AuraUtil.FindAuraByName then
+    for _, n in ipairs({ "Stealth", "Prowl", "Vanish" }) do
+      local ok, a = pcall(AuraUtil.FindAuraByName, n, "player", "HELPFUL")
+      if ok and a and not ns.IsSecret(a) then return true, "aura " .. n end
+    end
+  end
+  local _, class = UnitClass("player")
+  if class == "ROGUE" and GetShapeshiftForm then
+    local f = GetShapeshiftForm()
+    if not ns.IsSecret(f) and (f or 0) > 0 then return true, "stance " .. f end
+  end
+  return false, "none"
+end
+
 -- combo points. modern clients keep them as player power; the old client
 -- keeps them per-target. read both and take whichever this build fills.
 -- if either comes back secret we hand that back untouched (display only).
