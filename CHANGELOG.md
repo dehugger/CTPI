@@ -33,6 +33,12 @@
   spells. Toggle under Behavior.
 - Enemy clicks now target exactly what's under the reticle first, then the
   soft enemy.
+- **Hard lock** (Behavior, on by default): in combat with a live hostile
+  target, left-click acts on that target instead of retargeting to whatever
+  is under the reticle (corpses still loot), and right-click becomes
+  "unlock" (clears the target). Releases on its own when the target dies or
+  combat ends. Uses the secure aim header; without it, the in-combat click
+  just keeps an existing hostile target.
 - **Interact key** (`/ctpi interactkey <KEY>`): an optional keyboard interact
   that also works in combat, when left-click is in lock mode.
 

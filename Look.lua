@@ -92,7 +92,20 @@ local function clickHint(token)
   local act = btn and actionFor(token)
   local enemyMode = token == "softenemy" and ns.EnemyClickMode and ns.EnemyClickMode()
   local spellHint = enemyMode and ns.EnemyClickHint and ns.EnemyClickHint()
-  if spellHint then
+  local hardLocked = enemyMode and ns.HardLocked and ns.HardLocked()
+  if hardLocked then
+    -- locked on your target: clicks wont switch to this one
+    if style == "text" then
+      parts[#parts + 1] = "locked   right-click: unlock"
+    else
+      local p = tex(LOCK_ICON, s)
+      if style == "icons" then p = p .. " Locked" end
+      parts[#parts + 1] = p
+      local u = atlas("NPE_RightClick", s)
+      if style == "icons" then u = u .. " Unlock" end
+      parts[#parts + 1] = u
+    end
+  elseif spellHint then
     -- context click: show what a click / shift-click will actually cast
     local function one(id)
       local icon = ns.SpellIcon(id)
@@ -252,6 +265,7 @@ local function hintSig(token)
   local btn = ns.InteractButtonLabel and ns.InteractButtonLabel() or ""
   local h = (token == "softenemy" and ns.EnemyClickHint) and ns.EnemyClickHint()
   local hs = h and (tostring(h.main) .. "/" .. tostring(h.shift)) or ""
+  if token == "softenemy" and ns.HardLocked and ns.HardLocked() then hs = hs .. "|L" end
   return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn .. "|" .. hs
 end
 

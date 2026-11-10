@@ -88,6 +88,17 @@ local enemyBtn = CreateFrame("Button", "CTPIEnemyClickButton", UIParent, "Secure
 enemyBtn:RegisterForClicks("AnyUp", "AnyDown")
 enemyBtn:SetAttribute("type", "macro")
 
+-- hard lock (db.hardLock): in combat with a live hostile target, left-click
+-- acts on that target without retargeting, and right-click unlocks
+-- (clears the target, so the next left-click grabs what's under the reticle)
+local lockedBtn = CreateFrame("Button", "CTPIEnemyLockedButton", UIParent, "SecureActionButtonTemplate")
+lockedBtn:RegisterForClicks("AnyUp", "AnyDown")
+lockedBtn:SetAttribute("type", "macro")
+local unlockBtn = CreateFrame("Button", "CTPIUnlockButton", UIParent, "SecureActionButtonTemplate")
+unlockBtn:RegisterForClicks("AnyUp", "AnyDown")
+unlockBtn:SetAttribute("type", "macro")
+unlockBtn:SetAttribute("macrotext", "/cleartarget")
+
 -- ---------------------------------------------------------------------
 -- Context-aware enemy click ("lock + attack" mode).
 -- The enemy button's macro is rewritten out of combat whenever the
@@ -176,16 +187,37 @@ local function enemyPlan(forCombat)
   return TARGET_LINE .. "\n" .. ATTACK_LINE, nil
 end
 
-local currentMacro, currentHint
+local currentMacro, currentLocked, currentHint
 -- forCombat: called on PLAYER_REGEN_DISABLED, the last chance to set it
 function ns.UpdateEnemyMacro(forCombat)
   if InCombatLockdown() then return end
   local text, hint = enemyPlan(forCombat)
   currentHint = hint
+  -- no secure aim header (fallback): hard lock = keep a live hostile target
+  -- in combat instead of retargeting, via the macro itself
+  local db = ns.db
+  if forCombat and db and db.hardLock and not ns.secureAimOK then
+    text = text:gsub("^/target ", "/target [@target,harm,nodead] target; ", 1)
+  end
   if text ~= currentMacro then
     enemyBtn:SetAttribute("macrotext", text)
     currentMacro = text
   end
+  local locked = text:match("^/target[^\n]*\n(.*)$") or "/stopmacro"
+  if locked ~= currentLocked then
+    lockedBtn:SetAttribute("macrotext", locked)
+    currentLocked = locked
+  end
+end
+
+-- "locked" as the label should show it (the secure driver decides the real
+-- thing; this mirrors its condition from addon code)
+function ns.HardLocked()
+  local db = ns.db
+  if not (db and db.hardLock and ns.EnemyClickMode() and InCombatLockdown()) then return false end
+  local e, h, d = UnitExists("target"), UnitCanAttack("player", "target"), UnitIsDead("target")
+  if ns.IsSecret(e) or ns.IsSecret(h) or ns.IsSecret(d) then return true end
+  return (e and h and not d) and true or false
 end
 
 -- for the look-at label: what a click / shift-click on an enemy will cast
@@ -262,27 +294,47 @@ end
 -- login (ns.secureAimOK) and the insecure path below is the fallback.
 -- ---------------------------------------------------------------------
 local AIM_DRIVER = "[@mouseover,dead] interact; [@mouseover,help] interact; "
-  .. "[@mouseover,harm] enemy; [@mouseover,exists] interact; "
+  .. "[@mouseover,noharm,exists] interact; "
+  .. "[combat,@target,harm,nodead] locked; "
+  .. "[@mouseover,harm] enemy; "
   .. "[@softinteract,exists] interact; [@softenemy,harm,nodead] enemy; "
   .. "[combat] enemy; interact"
+-- (the "locked" state only acts like it when hard lock is on; otherwise the
+-- snippet treats it as "enemy")
 
 local header = CreateFrame("Frame", "CTPIAimHeader", UIParent, "SecureHandlerStateTemplate")
 header:SetAttribute("apply", [[
   local st = ...
   if self:GetAttribute("ctpi-off") then
     self:ClearBindings()
-  elseif self:GetAttribute("ctpi-autorun") then
+    return
+  end
+  local hard = self:GetAttribute("ctpi-hardlock")
+  if st == "locked" and not hard then st = "enemy" end
+  -- BUTTON1
+  if self:GetAttribute("ctpi-autorun") then
     self:SetBinding(true, "BUTTON1", "MOVEFORWARD")
+  elseif st == "locked" then
+    self:SetBindingClick(true, "BUTTON1", "CTPIEnemyLockedButton")
   elseif st == "enemy" then
     self:SetBindingClick(true, "BUTTON1", "CTPIEnemyClickButton")
   else
     self:SetBinding(true, "BUTTON1", "INTERACTMOUSEOVER")
   end
+  -- BUTTON2: unlock while hard-locked, else its normal action
+  local right = self:GetAttribute("ctpi-right")
+  if st == "locked" then
+    self:SetBindingClick(true, "BUTTON2", "CTPIUnlockButton")
+  elseif right then
+    self:SetBinding(true, "BUTTON2", right)
+  else
+    self:ClearBinding("BUTTON2")
+  end
 ]])
 header:SetAttribute("_onstate-aim", [[ self:RunAttribute("apply", newstate) ]])
 
 ns.secureAimOK = false
-local driverOn, hOff, hAuto = false, nil, nil
+local driverOn, hOff, hAuto, hRight, hHard = false, nil, nil, nil, nil
 
 function ns.ProbeSecureAim()
   if InCombatLockdown() then return end
@@ -304,13 +356,18 @@ ns.AimHeaderActive = function() return useHeader() and driverOn end
 
 local function headerSync(off, autorun)
   if InCombatLockdown() then return end
+  local db = ns.db
   local fresh = false
   if not driverOn then RegisterStateDriver(header, "aim", AIM_DRIVER); driverOn = true; fresh = true end
   off, autorun = off and true or nil, autorun and true or nil
-  if fresh or off ~= hOff or autorun ~= hAuto then
-    hOff, hAuto = off, autorun
+  local right = (db and CLICK_ACTIONS[db.rightAction]) and db.rightAction or nil
+  local hard = (db and db.hardLock) and true or nil
+  if fresh or off ~= hOff or autorun ~= hAuto or right ~= hRight or hard ~= hHard then
+    hOff, hAuto, hRight, hHard = off, autorun, right, hard
     header:SetAttribute("ctpi-off", off)
     header:SetAttribute("ctpi-autorun", autorun)
+    header:SetAttribute("ctpi-right", right)
+    header:SetAttribute("ctpi-hardlock", hard)
     SecureHandlerExecute(header, [[ self:RunAttribute("apply", self:GetAttribute("state-aim")) ]])
   end
 end
@@ -318,7 +375,7 @@ end
 local function headerStop()
   if InCombatLockdown() or not driverOn then return end
   UnregisterStateDriver(header, "aim")
-  driverOn, hOff, hAuto = false, nil, nil
+  driverOn, hOff, hAuto, hRight, hHard = false, nil, nil, nil, nil
   ClearOverrideBindings(header)
 end
 
@@ -345,7 +402,9 @@ function ns.ApplyClickBindings()
   else
     setClick("BUTTON1", nil)
   end
-  if CLICK_ACTIONS[db.rightAction] then
+  if useHeader() then
+    setClick("BUTTON2", nil)                    -- header owns BUTTON2 too (unlock)
+  elseif CLICK_ACTIONS[db.rightAction] then
     setClick("BUTTON2", "A", db.rightAction)
   else
     setClick("BUTTON2", nil)

@@ -518,7 +518,8 @@ local defaults = {
   leftAction   = "INTERACTMOUSEOVER",
   leftStopsAutorun = true,         -- while autorunning, left-click stops it (Secure.lua)
   leftEnemy    = "interact",       -- left-click on enemies: interact | lock | lockattack
-  rogueOpeners = true,             -- rogue + lockattack: stealth click = pick pocket / ambush (shift: sap / garrote)
+  rogueOpeners = true,
+  hardLock     = true,             -- in combat, left-click sticks to your target; right-click unlocks             -- rogue + lockattack: stealth click = pick pocket / ambush (shift: sap / garrote)
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in

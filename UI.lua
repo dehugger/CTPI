@@ -540,7 +540,13 @@ local function buildBehaviorPage(page)
   cOpen:SetPoint("TOPLEFT", enemyBtns[1], "BOTTOMLEFT", -4, -4)
   controls[#controls+1] = cOpen
 
-  local rightLbl = smallLabel(page, "Right-click", cOpen, 4, -8)
+  local cHard = makeCheck(page, "Hard lock in combat: clicks stick to your target, right-click unlocks",
+    function() return db.hardLock end,
+    function(v) db.hardLock = v; ns.RefreshBindings() end)
+  cHard:SetPoint("TOPLEFT", cOpen, "BOTTOMLEFT", 0, -2)
+  controls[#controls+1] = cHard
+
+  local rightLbl = smallLabel(page, "Right-click", cHard, 4, -8)
   local rightBtns, rightRepaint = makeChoiceRow(page, CLICK_CHOICES,
     function() return db.rightAction end,
     function(v) db.rightAction = v; ns.RefreshBindings() end)
