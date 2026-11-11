@@ -111,6 +111,7 @@ local function buildFrames()
     -- free the cursor the moment a ring opens; re-lock when it closes
     r:HookScript("OnShow", function(self)
       if IsMouselooking() then MouselookStop() end
+      if ns.RecordFreeCursor then C_Timer.After(0, ns.RecordFreeCursor) end
       -- out of combat, also place the ring from addon code once the cursor is
       -- actually visible: corrects the secure placement if it read the
       -- position early, and is the only placement without secure snippets

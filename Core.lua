@@ -412,8 +412,42 @@ local function engage()
   ns.ApplyClickBindings()   -- Secure.lua (no-op in combat)
 end
 
+-- where the cursor shows up when the camera lets go, for /ctpi why
+-- (fractions of the screen: 0,0 = bottom-left, 0.5,0.5 = center)
+local function recordFreeCursor()
+  local x, y = GetCursorPosition()
+  local sc = UIParent:GetEffectiveScale()
+  local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+  if x and w and w > 0 and h > 0 then
+    ns.lastFreeCursor = { x = (x / sc) / w, y = (y / sc) / h }
+  end
+end
+ns.RecordFreeCursor = recordFreeCursor
+
+-- cursor when the camera lets go (db.cursorReturn):
+--   "game"   leave the game's setting alone
+--   "stay"   reappear where it was (CursorFreelookCentering 0)
+--   "center" the game's centering (CursorFreelookCentering 1)
+-- your own value is saved and put back on logout or when set to "game"
+function ns.ApplyCursorReturn()
+  local db = ns.db
+  if not db then return end
+  local mode = db.cursorReturn or "game"
+  if mode == "game" then
+    if db.savedCursorCentering ~= nil then
+      pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
+      db.savedCursorCentering = nil
+    end
+    return
+  end
+  if db.savedCursorCentering == nil then
+    db.savedCursorCentering = ns.GetCVar("CursorFreelookCentering") or "0"
+  end
+  pcall(ns.SetCVar, "CursorFreelookCentering", mode == "center" and 1 or 0)
+end
+
 local function disengage()
-  if IsMouselooking() then MouselookStop() end
+  if IsMouselooking() then MouselookStop(); C_Timer.After(0, recordFreeCursor) end
   updateReticle(false)
   if ns.UpdateLook then ns.UpdateLook(false) end
   ns.RemoveClickBindings()  -- Secure.lua (no-op in combat)
@@ -533,6 +567,7 @@ local defaults = {
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
   focusDwell         = 1.0,        -- seconds at low FPS before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
+  cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
   clearFocusKey      = "",          -- clear focus ("" = unbound)
@@ -673,6 +708,7 @@ function handlers:PLAYER_LOGIN()
   end
   applySoftTarget()
   ns.ApplyBackgroundCap()
+  ns.ApplyCursorReturn()
   buildReticleFrame()
   buildComboFrame()
   if ns.BuildHUD then ns.BuildHUD() end
@@ -708,7 +744,14 @@ function handlers:ADDON_ACTION_BLOCKED(e, who, fn)   reportBlocked(e, who, fn) e
 function handlers:ADDON_ACTION_FORBIDDEN(e, who, fn) reportBlocked(e, who, fn) end
 
 -- put the player's own background fps cap back (re-applied next login)
-function handlers:PLAYER_LOGOUT() ns.RestoreBackgroundCap() end
+function handlers:PLAYER_LOGOUT()
+  ns.RestoreBackgroundCap()
+  local db = ns.db
+  if db and db.savedCursorCentering ~= nil then   -- put your own value back
+    pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
+    db.savedCursorCentering = nil
+  end
+end
 
 function handlers:LOADING_SCREEN_ENABLED()  ns.SetLoadingScreen(true)  end
 function handlers:LOADING_SCREEN_DISABLED() ns.SetLoadingScreen(false); ns.SuppressFocusFor(3) end
@@ -854,6 +897,15 @@ SlashCmdList["CTPI"] = function(msg)
     p("radial menu " .. (db.radial.enabled and "on" or "off")
       .. (InCombatLockdown() and " |cFF888888(applies after combat)|r" or ""))
 
+  elseif cmd == "cursor" then
+    local v = rest:lower()
+    if v ~= "game" and v ~= "stay" and v ~= "center" then
+      p("usage: /ctpi cursor <game|stay|center>  (now: " .. tostring(db.cursorReturn or "game") .. ")"); return
+    end
+    db.cursorReturn = v
+    ns.ApplyCursorReturn()
+    p("cursor when the camera lets go: |cFFFFFF00" .. v .. "|r")
+
   elseif cmd == "setup" then
     if ns.OpenSetup then ns.OpenSetup() end
 
@@ -887,6 +939,20 @@ SlashCmdList["CTPI"] = function(msg)
       if ns.EnemyMacroText and ns.EnemyMacroText() then
         p("enemy click macro: |cFFAAAAAA" .. ns.EnemyMacroText():gsub("\n", " || ") .. "|r")
       end
+      -- cursor diagnostics: where it reappeared, and the game's centering cvars
+      local lf = ns.lastFreeCursor
+      p("last time the cursor was freed it appeared at " .. (lf and string.format(
+        "%d%% across, %d%% up", lf.x * 100 + 0.5, lf.y * 100 + 0.5) or "(not yet)")
+        .. "; cursor return mode: " .. tostring(db.cursorReturn or "game"))
+      local cv = {}
+      for _, name in ipairs({ "CursorFreelookCentering", "CursorCenteredYPos", "CursorStickyCentering",
+                              "CursorCenteredEmulation" }) do
+        local v = ns.GetCVar(name)
+        local d
+        if C_CVar and C_CVar.GetCVarDefault then d = C_CVar.GetCVarDefault(name) end
+        cv[#cv + 1] = name .. "=" .. tostring(v) .. (d and (" (default " .. tostring(d) .. ")") or "")
+      end
+      p("|cFFAAAAAA" .. table.concat(cv, ", ") .. "|r")
       local kf = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
       if kf then p("keyboard focus: " .. tostring(kf.GetName and kf:GetName() or "unnamed frame")) end
       p(string.format("fps %.0f, focus-loss threshold %.0f (background cap %s%s), cursor info: %s",

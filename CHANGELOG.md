@@ -11,6 +11,9 @@
   the game's Interact on Left Click, which is what left-click does when CTPI
   is off. It's no longer in the setup, and it's turned back on once for
   anyone the 3.0.0 setup changed.
+- **Cursor return setting** (quick menu, `/ctpi cursor game|stay|center`):
+  where the cursor reappears when the camera lets go. `/ctpi why` now shows
+  where it last appeared and the game's cursor-centering settings.
 
 ## 3.0.0
 
