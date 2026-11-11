@@ -40,8 +40,8 @@ License: [MIT](LICENSE)
 - **Druids:** clicks cast in caster form and attack in cat / bear.
 
 **Radial menu**
-- Hold **Shift** (or Ctrl / Alt) and a ring of spells appears around the aim
-  point. Slide toward one and click. Works in combat.
+- Hold **Shift** (or Ctrl / Alt) and a ring of spells opens around your
+  cursor. Slide toward one and click. Works in combat.
 - Different rings by context, set up per class: e.g. a stealth ring and a
   combat ring for rogues, one per form for druids. Fully editable.
 
@@ -145,8 +145,8 @@ uses the sanctioned routes:
   HUD arcs are built from status bars the game fills directly, and the label
   only displays names, so nothing breaks when values go secret.
 - **Game settings CTPI changes**, and puts back: the background frame rate cap
-  (set to 8 so focus loss is detectable), cursor centering (so the radial menu
-  opens under your cursor), and the hidden over-the-shoulder camera setting.
+  (set to 8 so focus loss is detectable) and the hidden over-the-shoulder
+  camera setting.
   Your own values are restored on logout or when you turn the feature off.
 
 **Known limits**

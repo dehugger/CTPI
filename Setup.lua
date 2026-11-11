@@ -54,12 +54,10 @@ end
 local GAME_SETTINGS = {
   { cvar = "autoInteract", value = "0", label = "Turn off Click-to-Move",
     why = "so a stray click doesn't walk you somewhere" },
-  { cvar = "interactOnLeftClick", value = "0", label = "Turn off the game's Interact on Left Click",
-    why = "CTPI handles left-click itself" },
   { cvar = "deselectOnClick", value = "0", label = "Turn on Sticky Targeting",
     why = "your target stays until you pick another" },
 }
-local wantGame = { true, true, true }
+local wantGame = { true, true }
 
 local function stepWelcome(p)
   local h = header(p, "Welcome to Coffee's Touchpad Improvements")

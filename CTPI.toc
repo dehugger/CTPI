@@ -2,7 +2,7 @@
 ## Title: |cFFc8a25eCoffee's Touchpad Improvements|r
 ## Notes: Play on a trackpad: always-on mouselook, click to lock and attack, a Shift radial spell menu, and a HUD at the aim point.
 ## Author: coffeeofdoom
-## Version: 3.0.0
+## Version: 3.0.1
 ## SavedVariables: CTPIDB
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## AddonCompartmentFunc: CTPI_OnAddonCompartmentClick

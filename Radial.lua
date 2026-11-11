@@ -36,6 +36,7 @@ local pending = false
 -- capital letter in chat shouldn't pop the ring). needs secure snippets;
 -- without them each ring gets a plain visibility driver instead.
 local header = CreateFrame("Frame", "CTPIRadialHeader", UIParent, "SecureHandlerStateTemplate")
+header:SetAllPoints(UIParent)   -- full screen (mouse disabled), so it can read the cursor position
 header:SetAttribute("_onstate-radial", [[
   for i = 1, 6 do
     local r = self:GetFrameRef("ring" .. i)
@@ -43,7 +44,21 @@ header:SetAttribute("_onstate-radial", [[
   end
   if newstate ~= "0" and not self:GetAttribute("ctpi-typing") then
     local r = self:GetFrameRef("ring" .. newstate)
-    if r then r:Show() end
+    if r then
+      -- open the ring right where the cursor is (it reappears there when the
+      -- camera lets go), kept far enough from the screen edges to fit
+      local mx, my = self:GetMousePosition()
+      if mx and my then
+        local w, h = self:GetWidth(), self:GetHeight()
+        local m = self:GetAttribute("ctpi-margin") or 0
+        local x, y = mx * w, my * h
+        if x < m then x = m elseif x > w - m then x = w - m end
+        if y < m then y = m elseif y > h - m then y = h - m end
+        r:ClearAllPoints()
+        r:SetPoint("CENTER", self, "BOTTOMLEFT", x, y)
+      end
+      r:Show()
+    end
   end
 ]])
 local headerDriver = false
@@ -94,8 +109,21 @@ local function buildFrames()
     r.slots = {}
     for j = 1, MAX_SLOTS do r.slots[j] = makeSlot(r, i, j) end
     -- free the cursor the moment a ring opens; re-lock when it closes
-    r:HookScript("OnShow", function()
+    r:HookScript("OnShow", function(self)
       if IsMouselooking() then MouselookStop() end
+      -- out of combat, also place the ring from addon code once the cursor is
+      -- actually visible: corrects the secure placement if it read the
+      -- position early, and is the only placement without secure snippets
+      if not InCombatLockdown() then
+        local x, y = GetCursorPosition()
+        local sc = UIParent:GetEffectiveScale()
+        local m = ((ns.db and ns.db.radial.radius) or 110) + 40
+        local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+        x = math.min(math.max(x / sc, m), w - m)
+        y = math.min(math.max(y / sc, m), h - m)
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+      end
       ns.ForceReconcile()
     end)
     r:HookScript("OnHide", function() ns.ForceReconcile() end)
@@ -235,6 +263,7 @@ function ns.RebuildRadial()
     prior = prior .. clause(mod, groups, "hide")
   end
   if useHeader and headerCond ~= "" then
+    header:SetAttribute("ctpi-margin", radius + size)
     RegisterStateDriver(header, "radial", headerCond .. "0")
     headerDriver = true
   end
@@ -260,15 +289,13 @@ end
 -- ---------------------------------------------------------------------
 -- cursor centering (so the cursor lands in the middle of the ring)
 -- ---------------------------------------------------------------------
+-- 3.0.0 turned on CursorFreelookCentering to bring the cursor to the ring;
+-- on high-DPI screens that parks the cursor up and to the left instead. The
+-- ring now opens wherever the cursor is, so the setting is left alone, and
+-- this only puts back a value 3.0.0 changed.
 function ns.ApplyFreelookCentering()
   local db = ns.db
-  if not db then return end
-  if db.enabled and db.radial.enabled then
-    if db.savedFreelookCentering == nil then
-      db.savedFreelookCentering = ns.GetCVar("CursorFreelookCentering") or "0"
-    end
-    pcall(ns.SetCVar, "CursorFreelookCentering", 1)
-  elseif db.savedFreelookCentering ~= nil then
+  if db and db.savedFreelookCentering ~= nil then
     pcall(ns.SetCVar, "CursorFreelookCentering", db.savedFreelookCentering)
     db.savedFreelookCentering = nil
   end

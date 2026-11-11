@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.1
+
+- **Cursor no longer jumps up and to the left.** 3.0.0 turned on the game's
+  CursorFreelookCentering to bring the cursor to the radial ring; on high-DPI
+  screens it parks the cursor off-center instead. The setting is left alone
+  now (any value 3.0.0 changed is put back), and the radial ring opens
+  wherever the cursor actually is, kept clear of the screen edges.
+- **Left-click works again with CTPI toggled off.** The 3.0.0 setup turned off
+  the game's Interact on Left Click, which is what left-click does when CTPI
+  is off. It's no longer in the setup, and it's turned back on once for
+  anyone the 3.0.0 setup changed.
+
 ## 3.0.0
 
 **New**

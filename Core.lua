@@ -663,6 +663,14 @@ function handlers:ADDON_LOADED(_, name)
 end
 
 function handlers:PLAYER_LOGIN()
+  -- 3.0.0's setup turned off the game's Interact on Left Click, which is
+  -- what left-click does when CTPI is toggled off. put it back once.
+  if (ns.db.setupVersion or 0) >= 3 and not ns.db.fixedInteractOnLeftClick then
+    ns.db.fixedInteractOnLeftClick = true
+    if ns.GetCVar("interactOnLeftClick") == "0" and ns.db.leftAction ~= "NATIVE" then
+      pcall(ns.SetCVar, "interactOnLeftClick", 1)
+    end
+  end
   applySoftTarget()
   ns.ApplyBackgroundCap()
   buildReticleFrame()
