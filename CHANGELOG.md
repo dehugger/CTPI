@@ -11,6 +11,9 @@
   the game's Interact on Left Click, which is what left-click does when CTPI
   is off. It's no longer in the setup, and it's turned back on once for
   anyone the 3.0.0 setup changed.
+- **Pick Pocket no longer changes your target:** the stealth click casts it
+  straight on whatever's under the reticle. Shift-click Sap still targets the
+  mob. Robbed mobs are remembered by who you clicked, not your target.
 - **Cursor return setting** (quick menu, `/ctpi cursor game|stay|center`):
   where the cursor reappears when the camera lets go. `/ctpi why` now shows
   where it last appeared and the game's cursor-centering settings.

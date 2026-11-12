@@ -144,8 +144,7 @@ end
 
 -- GUIDs you've already pickpocketed (a mob can only be robbed once)
 local picked, pickedCount = {}, 0
-local function markPicked(unit)
-  local g = UnitGUID(unit)
+local function markPickedGUID(g)
   if not g or ns.IsSecret(g) or picked[g] then return end
   picked[g] = true
   pickedCount = pickedCount + 1
@@ -190,8 +189,11 @@ local function enemyPlan(forCombat)
       local g = u and UnitGUID(u)
       local robbed = g and not ns.IsSecret(g) and picked[g]
       if u and isHumanoid(u) and not robbed then
-        return TARGET_LINE .. "\n/cast [mod:shift] " .. spellName(SPELL.SAP) .. "; " .. spellName(SPELL.PICKPOCKET),
-               { main = SPELL.PICKPOCKET, shift = SPELL.SAP }
+        local sap, pp = spellName(SPELL.SAP), spellName(SPELL.PICKPOCKET)
+        return "/target [mod:shift,@mouseover,harm,nodead] mouseover; [mod:shift,@softenemy,harm,nodead] softenemy"
+          .. "\n/cast [mod:shift] " .. sap
+          .. "; [@mouseover,harm,nodead][@softenemy,harm,nodead] " .. pp,
+          { main = SPELL.PICKPOCKET, shift = SPELL.SAP }
       end
       return TARGET_LINE .. "\n" .. opener, { main = SPELL.AMBUSH, shift = SPELL.GARROTE }
     end
@@ -199,6 +201,13 @@ local function enemyPlan(forCombat)
   end
   return TARGET_LINE .. "\n" .. action, hint
 end
+
+local lastClickGUID
+enemyBtn:HookScript("OnClick", function()
+  local u = aimUnit()
+  local g = u and UnitGUID(u)
+  if g and not ns.IsSecret(g) then lastClickGUID = g end
+end)
 
 local currentMacro, currentLocked, currentHint
 -- forCombat: called on PLAYER_REGEN_DISABLED, the last chance to set it
@@ -580,11 +589,11 @@ end
 aev:SetScript("OnEvent", function(self, event, a1, a2, a3)
   if event == "UNIT_SPELLCAST_SUCCEEDED" then
     -- a1 = unit, a3 = spellID: remember who you've pickpocketed
-    if a1 == "player" and not ns.IsSecret(a3) and a3 == SPELL.PICKPOCKET then markPicked("target") end
+    if a1 == "player" and not ns.IsSecret(a3) and a3 == SPELL.PICKPOCKET then markPickedGUID(lastClickGUID) end
   elseif event == "UI_ERROR_MESSAGE" then
     -- "no pockets to pick" also means this one's done
     if ERR_ALREADY_PICKPOCKETED and not ns.IsSecret(a2) and a2 == ERR_ALREADY_PICKPOCKETED then
-      markPicked("target")
+      markPickedGUID(lastClickGUID)
     end
   elseif event == "PLAYER_STARTED_MOVING" then
     -- fallback if the hooks dont fire: right-click autorun just started
