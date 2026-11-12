@@ -11,10 +11,11 @@
   the game's Interact on Left Click, which is what left-click does when CTPI
   is off. It's no longer in the setup, and it's turned back on once for
   anyone the 3.0.0 setup changed.
-- **Sectioned radial ring:** the radial is now a ring split into sections
-  instead of loose buttons. Slide into a section (it lights up) and click
-  anywhere in it; the middle is a dead zone. In combat a secure click handler
-  picks the section from the cursor direction.
+- **Console-style radial:** the radial is now a sectioned ring around the
+  reticle, bigger by default. The direction you move picks the section (it
+  lights up, with a pointer showing your direction) and any click casts it;
+  not moving picks nothing. Works the same wherever the cursor shows up, and
+  in combat (a secure click handler reads the direction).
 - **Radial only while the camera is locked:** it no longer opens while you're
   typing, in free-cursor mode, with a window open, or with CTPI off.
 - **Faster, steadier background detection:** measures each frame instead of

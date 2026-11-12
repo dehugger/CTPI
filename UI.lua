@@ -536,7 +536,7 @@ local function buildClassPage(page)
     function(v) db.radial.mod = v; rebuildClass() end)
   modBtns[1]:SetPoint("LEFT", cRad, "RIGHT", 70, 0)
   repaints[#repaints+1] = modRepaint
-  local rRad = makeSliderRow(page, "Ring size", 60, 220, 1, nil,
+  local rRad = makeSliderRow(page, "Ring size", 90, 320, 1, nil,
     function() return db.radial.radius end, function(v) db.radial.radius = v; rebuildClass() end)
   rRad:SetPoint("TOPLEFT", cRad, "BOTTOMLEFT", 4, -4)
   controls[#controls+1] = rRad

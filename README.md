@@ -41,8 +41,8 @@ License: [MIT](LICENSE)
 
 **Radial menu**
 - Hold **Shift** (or Ctrl / Alt) while the camera is locked and a sectioned
-  ring of spells opens around your cursor. Slide into a section and click.
-  Works in combat.
+  ring of spells opens around the reticle. Move in a direction to pick a
+  section, like a console radial, and click. Works in combat.
 - Different rings by context, set up per class: e.g. a stealth ring and a
   combat ring for rogues, one per form for druids. Fully editable.
 

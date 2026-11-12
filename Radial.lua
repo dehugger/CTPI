@@ -3,9 +3,16 @@ local addonName, ns = ...
 -- =====================================================================
 -- CTPI / Radial.lua
 -- Hold a modifier (Shift by default) while the camera is locked and a
--- sectioned ring opens around the cursor: the camera lets go, you slide
--- into a section (it lights up) and click to cast it. Let go of the
--- modifier and the ring closes and the camera locks again.
+-- sectioned ring opens around the reticle. It works like a console radial:
+-- the direction you move picks the section (it lights up, and a pointer
+-- shows your direction), and a click casts it. Not moving picks nothing.
+-- Let go of the modifier and the ring closes and the camera locks again.
+--
+-- Two layers:
+--   * the visible ring sits around the reticle (plain addon frames)
+--   * the click is an invisible, screen-covering secure button centered on
+--     wherever the cursor appeared, so "direction moved" = "cursor relative
+--     to that button's center", whatever spot the cursor showed up at
 --
 -- Which ring opens depends on context: each class has rings with a macro
 -- condition ("[stealth]", "[{cat}]", "" = default); the first match wins.
@@ -27,8 +34,10 @@ local addonName, ns = ...
 -- =====================================================================
 
 local MAX_RINGS, MAX_SLOTS = 6, 8
-local SEGMENTS = 72            -- line pieces that draw the band
-local INNER = 0.42             -- inner radius as a fraction of the outer
+local SEGMENTS = 96            -- line pieces that draw the band
+local INNER = 0.55             -- inner radius as a fraction of the outer
+local PIE = 4000               -- the invisible click area (bigger than any screen)
+local DEAD = 18                -- move at least this far (px) to pick a section
 local ringFrames = {}
 local pending = false
 
@@ -52,12 +61,10 @@ header:SetAttribute("_onstate-radial", [[
       local mx, my = self:GetMousePosition()
       if mx and my then
         local w, h = self:GetWidth(), self:GetHeight()
-        local m = self:GetAttribute("ctpi-margin") or 0
-        local x, y = mx * w, my * h
-        if x < m then x = m elseif x > w - m then x = w - m end
-        if y < m then y = m elseif y > h - m then y = h - m end
+        -- the click layer centers on the cursor; the visible ring stays at
+        -- the reticle
         r:ClearAllPoints()
-        r:SetPoint("CENTER", self, "BOTTOMLEFT", x, y)
+        r:SetPoint("CENTER", self, "BOTTOMLEFT", mx * w, my * h)
       end
       r:Show()
     end
@@ -99,12 +106,13 @@ local function buildFrames()
   for i = 1, MAX_RINGS do
     local r = CreateFrame("Frame", "CTPIRadial" .. i, UIParent)
     r:SetFrameStrata("DIALOG")
-    r:SetSize(200, 200)
+    r:SetSize(1, 1)
     r:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-    -- the whole ring is one secure button (sections picked on click)
+    -- the click layer: one huge secure button centered on the cursor
     local pie = CreateFrame("Button", "CTPIRadial" .. i .. "Pie", r, "SecureActionButtonTemplate")
-    pie:SetAllPoints(r)
+    pie:SetSize(PIE, PIE)
+    pie:SetPoint("CENTER", r, "CENTER", 0, 0)
     pie:RegisterForClicks("AnyUp", "AnyDown")
     pie:SetAttribute("type", "macro")
     pie:Hide()
@@ -113,9 +121,10 @@ local function buildFrames()
     r.slots = {}
     for j = 1, MAX_SLOTS do r.slots[j] = makeFallbackSlot(r, i, j) end
 
-    -- visuals live on a plain child frame (highlighting is addon code)
+    -- visuals: a plain child frame parked around the reticle
     local v = CreateFrame("Frame", nil, r)
-    v:SetAllPoints(r)
+    v:SetSize(200, 200)
+    v:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     v:SetFrameLevel(pie:GetFrameLevel() + 2)
     v.segs, v.edges, v.icons, v.labels = {}, {}, {}, {}
     if v.CreateLine then
@@ -139,6 +148,13 @@ local function buildFrames()
       if f then lb:SetFont(f, sz, "OUTLINE") end
       v.labels[k] = lb
     end
+    if v.CreateLine then
+      local ptr = v:CreateLine(nil, "OVERLAY")
+      ptr:SetThickness(3)
+      ptr:SetColorTexture(1, 0.85, 0.45, 0.9)
+      ptr:Hide()
+      v.pointer = ptr
+    end
     v.center = v:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     v.center:SetPoint("CENTER", v, "CENTER", 0, 0)
     local f, sz = v.center:GetFont()
@@ -155,14 +171,13 @@ local function buildFrames()
       -- out of combat, re-place under the now-visible cursor (corrects the
       -- secure placement, and is the only placement without snippets)
       if not InCombatLockdown() then
-        local x, y = GetCursorPosition()
-        local sc = UIParent:GetEffectiveScale()
-        local m = ((ns.db and ns.db.radial.radius) or 110) + 50
-        local w, h = UIParent:GetWidth(), UIParent:GetHeight()
-        x = math.min(math.max(x / sc, m), w - m)
-        y = math.min(math.max(y / sc, m), h - m)
-        self:ClearAllPoints()
-        self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+        C_Timer.After(0, function()
+          if InCombatLockdown() or not self:IsShown() then return end
+          local x, y = GetCursorPosition()
+          local sc = UIParent:GetEffectiveScale()
+          self:ClearAllPoints()
+          self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / sc, y / sc)
+        end)
       end
       self.hover = -1
       ns.ForceReconcile()
@@ -205,13 +220,24 @@ end
 local function hoverSection(r)
   local n = r.n or 0
   if n == 0 then return nil end
-  local cx, cy = r:GetCenter()
+  local cx, cy = r:GetCenter()          -- where the cursor started
   if not cx then return nil end
   local x, y = GetCursorPosition()
   local sc = r:GetEffectiveScale()
   local dx, dy = x / sc - cx, y / sc - cy
-  local inner = (r.outer or 110) * INNER
-  if dx * dx + dy * dy < inner * inner then return nil end
+  local v = r.v
+  if v.pointer then
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len >= DEAD then
+      local inner = (r.outer or 160) * INNER
+      v.pointer:SetStartPoint("CENTER", v, 0, 0)
+      v.pointer:SetEndPoint("CENTER", v, dx / len * inner * 0.85, dy / len * inner * 0.85)
+      v.pointer:Show()
+    else
+      v.pointer:Hide()
+    end
+  end
+  if dx * dx + dy * dy < DEAD * DEAD then return nil end
   local best, pick = -math.huge, nil
   for k = 1, n do
     local a = sectionAngle(k, n)
@@ -227,7 +253,10 @@ local function layoutRing(r, outer, entries, ringName, useSecure)
   local mid, band = (outer + inner) / 2, outer - inner
   r.n, r.outer, r.ringName = n, outer, ringName
   r.names = {}
-  r:SetSize(outer * 2, outer * 2)
+  local ret = ns.db.reticle
+  v:SetSize(outer * 2, outer * 2)
+  v:ClearAllPoints()
+  v:SetPoint("CENTER", UIParent, "CENTER", ret.x or 0, ret.y or 0)
 
   -- band: SEGMENTS short thick lines around the middle radius
   local step = 2 * math.pi / SEGMENTS
@@ -289,7 +318,7 @@ local function layoutRing(r, outer, entries, ringName, useSecure)
     end
   end
   r.pie:SetAttribute("ctpi-n", n)
-  r.pie:SetAttribute("ctpi-dead", INNER * 0.5)   -- in the pie's 0..1 coordinates
+  r.pie:SetAttribute("ctpi-dead", DEAD / PIE)   -- in the pie's 0..1 coordinates
   if useSecure and n > 0 then r.pie:Show() else r.pie:Hide() end
   paint(r, nil)
 end
@@ -386,7 +415,7 @@ function ns.RebuildRadial()
   end
 
   local mod = MOD_COND[db.radial.mod or "shift"] or "mod:shift"
-  local outer = db.radial.radius or 110
+  local outer = db.radial.radius or 170
 
   -- default (empty condition) rings go last so specific ones win
   local order = {}
@@ -427,7 +456,6 @@ function ns.RebuildRadial()
     prior = prior .. clause(mod, groups, "hide")
   end
   if useSecure and headerCond ~= "" then
-    header:SetAttribute("ctpi-margin", outer + 50)
     RegisterStateDriver(header, "radial", headerCond .. "0")
     headerDriver = true
   end

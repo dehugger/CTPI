@@ -633,7 +633,7 @@ local defaults = {
   radial = {
     enabled = true,   -- hold the modifier for a ring of spells (Radial.lua)
     mod     = "shift", -- "shift" | "ctrl" | "alt"
-    radius  = 110,
+    radius  = 170,
     size    = 44,
   },
   minimap = {
@@ -723,6 +723,10 @@ function handlers:ADDON_LOADED(_, name)
   -- interact on tap while mouselooking, so it only ever ran). same behavior:
   if CTPIDB.leftAction == "NATIVE" then CTPIDB.leftAction = "MOVEFORWARD" end
 
+  if not CTPIDB.radialV2 then   -- the ring got bigger: old default -> new default
+    if type(CTPIDB.radial) == "table" and CTPIDB.radial.radius == 110 then CTPIDB.radial.radius = nil end
+    CTPIDB.radialV2 = true
+  end
   if not CTPIDB.focusDwellV2 then
     if (CTPIDB.focusDwell or 0) >= 1 then CTPIDB.focusDwell = nil end
     CTPIDB.focusDwellV2 = true
