@@ -40,8 +40,9 @@ License: [MIT](LICENSE)
 - **Druids:** clicks cast in caster form and attack in cat / bear.
 
 **Radial menu**
-- Hold **Shift** (or Ctrl / Alt) and a ring of spells opens around your
-  cursor. Slide toward one and click. Works in combat.
+- Hold **Shift** (or Ctrl / Alt) while the camera is locked and a sectioned
+  ring of spells opens around your cursor. Slide into a section and click.
+  Works in combat.
 - Different rings by context, set up per class: e.g. a stealth ring and a
   combat ring for rogues, one per form for druids. Fully editable.
 

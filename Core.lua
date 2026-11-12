@@ -119,6 +119,7 @@ function ns.ApplyBackgroundCap()
     end
     pcall(ns.SetCVar, "useMaxFPSBk", 1)
     pcall(ns.SetCVar, "maxFPSBk", MANAGED_BK)
+    if ns.RefreshFocusLimit then ns.RefreshFocusLimit() end
   else
     ns.RestoreBackgroundCap()
   end
@@ -132,6 +133,9 @@ function ns.RestoreBackgroundCap()
   db.savedMaxFPSBk, db.savedUseMaxFPSBk = nil, nil
 end
 
+-- the fps below which a frame counts as "background". cached: reading
+-- cvars every frame isn't free, and the cap only changes when we set it.
+local frameLimit, limitAt = 1 / 10, 0
 local function focusThreshold()
   local db = ns.db
   if db and db.focusFpsThreshold and db.focusFpsThreshold > 0 then
@@ -139,25 +143,50 @@ local function focusThreshold()
   end
   local useBk = ns.GetCVar("useMaxFPSBk") ~= "0"
   local bk = tonumber(ns.GetCVar("maxFPSBk")) or 0
-  if useBk and bk > 0 then return math.min(bk + 2, 14) end
-  return 8   -- no background cap at all: only catch minimized / app nap
+  -- a low cap (like CTPI's 8) is unmistakable; a high one (30+) is a frame
+  -- rate normal play hits too, so then only catch minimized / app nap
+  if useBk and bk > 0 and bk <= 15 then return bk + 3 end
+  return 9
 end
+local function refreshLimit()
+  frameLimit, limitAt = 1 / focusThreshold(), GetTime()
+end
+ns.RefreshFocusLimit = refreshLimit
 
-local function updateFocusState()
+-- per-frame check, fed from the driver's OnUpdate. measures every frame's
+-- own duration instead of the game's 1-second fps average, so:
+--   * focus counts as lost after ~half a second of background-speed frames
+--   * it comes back after a quarter second of normal frames (a short grace,
+--     so the click that brings the window back isn't swallowed by mouselook)
+--   * one long frame (a hitch, a big pull) never trips it
+local slowFor, fastFor = 0, 0
+local function feedFrame(elapsed)
   local db = ns.db
   if not (db and db.unlockOnFocusLoss) or inLoadingScreen or GetTime() < suppressUntil then
-    focusLost, lowSince = false, nil
+    slowFor, fastFor = 0, 0
+    if focusLost then focusLost = false end
     return
   end
-  local fps = GetFramerate() or 60
-  if fps <= focusThreshold() then
-    local now = GetTime()
-    lowSince = lowSince or now
-    if (now - lowSince) >= (db.focusDwell or 1.0) then focusLost = true end
+  if GetTime() - limitAt > 2 then refreshLimit() end
+  if elapsed >= frameLimit then
+    fastFor = 0
+    slowFor = slowFor + elapsed
+    if not focusLost and slowFor >= (db.focusDwell or 0.5) then
+      focusLost = true
+      ns.ForceReconcile()
+    end
   else
-    focusLost, lowSince = false, nil
+    slowFor = 0
+    if focusLost then
+      fastFor = fastFor + elapsed
+      if fastFor >= 0.25 then
+        focusLost, fastFor = false, 0
+        ns.ForceReconcile()
+      end
+    end
   end
 end
+local function updateFocusState() end   -- (kept for the loop; work happens per frame)
 ns.SetLoadingScreen = function(v) inLoadingScreen = v end
 ns.SuppressFocusFor = function(sec) suppressUntil = GetTime() + (sec or 3) end
 
@@ -456,6 +485,7 @@ end
 local accum = 0
 local driver = CreateFrame("Frame")
 driver:SetScript("OnUpdate", function(self, elapsed)
+  feedFrame(elapsed)        -- focus / minimize detection, every frame
   accum = accum + elapsed
   if accum < (ns.db and ns.db.throttle or 0.05) then return end
   accum = 0
@@ -565,7 +595,7 @@ local defaults = {
   softTargetInteract = true,       -- vendors / nodes / mailboxes (softinteract)
   unlockOnFocusLoss  = true,       -- free cursor when the window loses focus (heuristic)
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
-  focusDwell         = 1.0,        -- seconds at low FPS before we call it focus-lost
+  focusDwell         = 0.5,        -- seconds of background-speed frames before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
   cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
@@ -692,6 +722,11 @@ function handlers:ADDON_LOADED(_, name)
   -- the experimental "NATIVE" left-click was removed (the game doesnt
   -- interact on tap while mouselooking, so it only ever ran). same behavior:
   if CTPIDB.leftAction == "NATIVE" then CTPIDB.leftAction = "MOVEFORWARD" end
+
+  if not CTPIDB.focusDwellV2 then
+    if (CTPIDB.focusDwell or 0) >= 1 then CTPIDB.focusDwell = nil end
+    CTPIDB.focusDwellV2 = true
+  end
 
   copyDefaults(CTPIDB, defaults)
   ns.db = CTPIDB
@@ -848,7 +883,7 @@ SlashCmdList["CTPI"] = function(msg)
     ns.ApplyBackgroundCap()
     ns.ForceReconcile()
     p("unlock cursor on focus loss " .. (db.unlockOnFocusLoss and "on" or "off")
-      .. " |cFF888888(windowed/borderless only, ~" .. tostring(db.focusDwell or 1.0) .. "s lag)|r")
+      .. " |cFF888888(windowed/borderless only, ~" .. tostring(db.focusDwell or 0.5) .. "s lag)|r")
 
   elseif cmd == "focusfps" and rest ~= "" then
     local n = tonumber(rest)

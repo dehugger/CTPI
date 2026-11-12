@@ -11,6 +11,16 @@
   the game's Interact on Left Click, which is what left-click does when CTPI
   is off. It's no longer in the setup, and it's turned back on once for
   anyone the 3.0.0 setup changed.
+- **Sectioned radial ring:** the radial is now a ring split into sections
+  instead of loose buttons. Slide into a section (it lights up) and click
+  anywhere in it; the middle is a dead zone. In combat a secure click handler
+  picks the section from the cursor direction.
+- **Radial only while the camera is locked:** it no longer opens while you're
+  typing, in free-cursor mode, with a window open, or with CTPI off.
+- **Faster, steadier background detection:** measures each frame instead of
+  the game's one-second fps average. Lets go of the cursor about half a second
+  after the window goes to the background, re-locks a quarter second after
+  you're back, and a single long frame (a hitch) can't trip it.
 - **Pick Pocket no longer changes your target:** the stealth click casts it
   straight on whatever's under the reticle. Shift-click Sap still targets the
   mob. Robbed mobs are remembered by who you clicked, not your target.
