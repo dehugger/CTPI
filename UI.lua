@@ -738,25 +738,42 @@ local function buildBehaviorPage(page)
   cHard:SetPoint("TOPLEFT", cOpen, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cHard
 
-  local rightLbl = smallLabel(page, "Right-click", cHard, 4, -8)
+  -- combo lock: one row, label on the left
+  local comboLbl = smallLabel(page, "Combo lock", cHard, 4, -10)
+  local comboBtns, comboRepaint = makeChoiceRow(page,
+    { { label = "Auto", value = "auto", w = 56 },
+      { label = "On",   value = "on",   w = 44 },
+      { label = "Off",  value = "off",  w = 44 } },
+    function() return db.comboLock or "auto" end,
+    function(v)
+      if InCombatLockdown() then return end
+      db.comboLock = v; ns.RefreshBindings()
+    end)
+  comboBtns[1]:SetPoint("LEFT", comboLbl, "RIGHT", 10, 0)
+  repaints[#repaints+1] = comboRepaint
+  local comboNote = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  comboNote:SetPoint("LEFT", comboBtns[#comboBtns], "RIGHT", 8, 0)
+  comboNote:SetPoint("RIGHT", page, "RIGHT", 0, 0)
+  comboNote:SetJustifyH("LEFT"); comboNote:SetWordWrap(true)
+  comboNote:SetText("in combat nothing steals your target (auto: rogue, cat form)")
+
+  local cTwo = makeCheck(page, "Unlock takes two right-clicks in a row",
+    function() return (db.unlockClicks or 2) >= 2 end,
+    function(v) db.unlockClicks = v and 2 or 1; ns.RefreshBindings() end)
+  cTwo:SetPoint("TOPLEFT", comboLbl, "BOTTOMLEFT", -4, -10)
+  controls[#controls+1] = cTwo
+
+  local rightLbl = smallLabel(page, "Right-click", cTwo, 4, -8)
   local rightBtns, rightRepaint = makeChoiceRow(page, CLICK_CHOICES,
     function() return db.rightAction end,
     function(v) db.rightAction = v; ns.RefreshBindings() end)
   rightBtns[1]:SetPoint("TOPLEFT", rightLbl, "BOTTOMLEFT", 0, -6)
   repaints[#repaints+1] = rightRepaint
 
-  local clickNote = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  clickNote:SetPoint("TOPLEFT", rightBtns[1], "BOTTOMLEFT", 0, -8)
-  clickNote:SetPoint("RIGHT", page, "RIGHT", 0, 0)
-  clickNote:SetJustifyH("LEFT"); clickNote:SetWordWrap(true)
-  clickNote:SetText("Interact attacks enemies and talks / loots / gathers everything else. "
-    .. "One action per button: tap-to-interact + hold-to-run on the same button isn't "
-    .. "possible while the camera is locked, so put them on different buttons.")
-
   local cStopAuto = makeCheck(page, "Left-click stops autorun (when left is Interact, out of combat)",
     function() return db.leftStopsAutorun end,
     function(v) db.leftStopsAutorun = v; if ns.SyncAutorunSwap then ns.SyncAutorunSwap() end end)
-  cStopAuto:SetPoint("TOPLEFT", clickNote, "BOTTOMLEFT", -4, -6)
+  cStopAuto:SetPoint("TOPLEFT", rightBtns[1], "BOTTOMLEFT", -4, -6)
   controls[#controls+1] = cStopAuto
 
   local hSoft = sectionHeader(page, "Look to target", cStopAuto, -12)

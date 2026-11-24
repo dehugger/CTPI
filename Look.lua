@@ -92,17 +92,23 @@ local function clickHint(token)
   local act = btn and actionFor(token)
   local enemyMode = token == "softenemy" and ns.EnemyClickMode and ns.EnemyClickMode()
   local spellHint = enemyMode and ns.EnemyClickHint and ns.EnemyClickHint()
-  local hardLocked = enemyMode and ns.HardLocked and ns.HardLocked()
+  local comboLocked = ns.ComboLocked and ns.ComboLocked()
+  local hardLocked = comboLocked or (enemyMode and ns.HardLocked and ns.HardLocked())
   if hardLocked then
     -- locked on your target: clicks wont switch to this one
+    local armed = ns.UnlockArmed and ns.UnlockArmed()
+    local two = (ns.db.unlockClicks or 2) >= 2
+    local unlockWord = armed and "Right-click again to unlock" or (two and "x2 Unlock" or "Unlock")
     if style == "text" then
-      parts[#parts + 1] = "locked   right-click: unlock"
+      parts[#parts + 1] = "locked   " .. (armed and "right-click again: unlock"
+        or (two and "right-click twice: unlock" or "right-click: unlock"))
     else
       local p = tex(LOCK_ICON, s)
       if style == "icons" then p = p .. " Locked" end
       parts[#parts + 1] = p
       local u = atlas("NPE_RightClick", s)
-      if style == "icons" then u = u .. " Unlock" end
+      if style == "icons" then u = u .. " " .. unlockWord
+      elseif armed then u = "|cFFc8a25e" .. u .. "|r" end
       parts[#parts + 1] = u
     end
   elseif spellHint then
@@ -278,7 +284,9 @@ local function hintSig(token)
   local h = (token == "softenemy" and ns.EnemyClickHint) and ns.EnemyClickHint()
   local hs = h and (tostring(h.main) .. "/" .. tostring(h.shift)) or ""
   if token == "softfriend" and InCombatLockdown() and ns.FriendClickSpell and ns.FriendClickSpell() then hs = hs .. "|F" end
-  if token == "softenemy" and ns.HardLocked and ns.HardLocked() then hs = hs .. "|L" end
+  if (token == "softenemy" and ns.HardLocked and ns.HardLocked()) or (ns.ComboLocked and ns.ComboLocked()) then
+    hs = hs .. "|L" .. ((ns.UnlockArmed and ns.UnlockArmed()) and "A" or "")
+  end
   return token .. "|" .. (actionFor(token) or "") .. "|" .. tostring(em) .. "|" .. btn .. "|" .. hs
 end
 

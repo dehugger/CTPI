@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.1.0
+
+- **Combo lock:** in combat, with a live hostile target, nothing under the
+  reticle can take your target away: not another mob, not a corpse, not a
+  party member walking through your crosshair. Left-click acts on the target
+  you have. Combo points live on the target, so this is what keeps them.
+  Auto (default) turns it on for rogues and druids in cat form; it can be on
+  for everyone or off (Behavior tab, quick menu). When the target dies the
+  lock lets go, so looting mid-fight still works.
+- **Two-tap unlock:** unlocking a locked target takes two right-clicks in a
+  row (a left-click in between cancels it), so a stray right-click can't drop
+  your target. The label shows "Right-click again to unlock" after the first.
+  One-click unlock is a checkbox away.
+- `/ctpi why` shows the combo lock and the aim driver's current state.
+
 ## 3.0.1
 
 - **Cursor no longer jumps up and to the left.** 3.0.0 turned on the game's

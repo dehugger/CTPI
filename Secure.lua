@@ -112,6 +112,37 @@ unlockBtn:RegisterForClicks("AnyUp", "AnyDown")
 unlockBtn:SetAttribute("type", "macro")
 unlockBtn:SetAttribute("macrotext", "/cleartarget")
 
+-- two-tap unlock: the first right-click only arms it, the second (with no
+-- left-click in between) clears the target. a stray right-click in a group
+-- fight shouldnt cost you your combo points. counted on the press only, and
+-- the release follows whatever the press decided, so it works with either
+-- key-down or key-up casting.
+local UNLOCK_PRE = [[
+  if not self:GetAttribute("ctpi-two") then return end
+  if down then
+    if self:GetAttribute("ctpi-armed") then
+      self:SetAttribute("ctpi-armed", nil)
+      self:SetAttribute("ctpi-fire", true)
+      return
+    end
+    self:SetAttribute("ctpi-armed", true)
+    self:SetAttribute("ctpi-fire", nil)
+    return false
+  end
+  if self:GetAttribute("ctpi-fire") then
+    self:SetAttribute("ctpi-fire", nil)
+    return
+  end
+  return false
+]]
+-- any left-click on the locked target disarms it
+local LOCKED_PRE = [[
+  if down then
+    local u = self:GetFrameRef("unlock")
+    if u then u:SetAttribute("ctpi-armed", nil) end
+  end
+]]
+
 -- ---------------------------------------------------------------------
 -- Context-aware enemy click ("lock + attack" mode).
 -- The enemy button's macro is rewritten out of combat whenever the
@@ -231,7 +262,9 @@ function ns.UpdateEnemyMacro(forCombat)
     friendBtn:SetAttribute("macrotext", ftext)
     currentFriend = ftext
   end
-  local locked = text:match("^/target[^\n]*\n(.*)$") or "/stopmacro"
+  -- (plain "lock" / interact modes have no action line: the locked click
+  -- just attacks the target you already have)
+  local locked = text:match("^/target[^\n]*\n(.*)$") or ns.AttackLine()
   if locked ~= currentLocked then
     lockedBtn:SetAttribute("macrotext", locked)
     currentLocked = locked
@@ -241,11 +274,53 @@ end
 -- "locked" as the label should show it (the secure driver decides the real
 -- thing; this mirrors its condition from addon code)
 function ns.HardLocked()
+  if ns.ComboLocked and ns.ComboLocked() then return true end
   local db = ns.db
   if not (db and db.hardLock and ns.EnemyClickMode() and InCombatLockdown()) then return false end
   local e, h, d = UnitExists("target"), UnitCanAttack("player", "target"), UnitIsDead("target")
   if ns.IsSecret(e) or ns.IsSecret(h) or ns.IsSecret(d) then return true end
   return (e and h and not d) and true or false
+end
+
+-- combo lock: in combat, with a live hostile target, nothing under the
+-- reticle (another mob, a corpse, a party member) can take your target away.
+-- combo points live on the target, so a retarget throws them out.
+-- returns active, formIndex (druids: only in cat form)
+function ns.ComboLockSpec()
+  local db = ns.db
+  local mode = db and db.comboLock or "auto"
+  if mode == "off" then return false end
+  if mode == "on" then return true end
+  local class = ns.PlayerClass()
+  if class == "ROGUE" then return true end
+  if class == "DRUID" then
+    local i = ns.FormIndex and ns.FormIndex("cat")
+    if i then return true, i end
+  end
+  return false
+end
+
+local function liveHostileTarget()
+  local e, h, d = UnitExists("target"), UnitCanAttack("player", "target"), UnitIsDead("target")
+  if ns.IsSecret(e) or ns.IsSecret(h) or ns.IsSecret(d) then return true end
+  return (e and h and not d) and true or false
+end
+
+-- addon-side mirror of the driver's "combo" state, for the label
+function ns.ComboLocked()
+  if not (ns.AimHeaderActive and ns.AimHeaderActive()) or not InCombatLockdown() then return false end
+  local on, form = ns.ComboLockSpec()
+  if not on then return false end
+  if form then
+    local cur = GetShapeshiftForm and GetShapeshiftForm()
+    if ns.IsSecret(cur) or cur ~= form then return false end
+  end
+  return liveHostileTarget()
+end
+
+-- the first of two unlock right-clicks has landed
+function ns.UnlockArmed()
+  return unlockBtn:GetAttribute("ctpi-armed") and true or false
 end
 
 -- for the look-at label: what a click / shift-click on an enemy will cast
@@ -339,8 +414,14 @@ header:SetAttribute("apply", [[
     return
   end
   local hard = self:GetAttribute("ctpi-hardlock")
-  if st == "locked" and not hard then st = "enemy" end
-  if (st == "enemy" or st == "locked") and not self:GetAttribute("ctpi-enemy") then st = "interact" end
+  local combo = false
+  if st == "combo" then st, combo = "locked", true end
+  if st == "locked" and not hard and not combo then st = "enemy" end
+  if (st == "enemy" or (st == "locked" and not combo)) and not self:GetAttribute("ctpi-enemy") then st = "interact" end
+  if st ~= "locked" then
+    local u = self:GetFrameRef("unlock")
+    if u then u:SetAttribute("ctpi-armed", nil) end
+  end
   if st == "friend" and not self:GetAttribute("ctpi-friend") then st = "interact" end
   -- BUTTON1
   if self:GetAttribute("ctpi-autorun") then
@@ -365,9 +446,26 @@ header:SetAttribute("apply", [[
   end
 ]])
 header:SetAttribute("_onstate-aim", [[ self:RunAttribute("apply", newstate) ]])
+SecureHandlerSetFrameRef(header, "unlock", unlockBtn)
+SecureHandlerSetFrameRef(lockedBtn, "unlock", unlockBtn)
+local unlockWrapped = false
+local function wrapUnlock()
+  if unlockWrapped or InCombatLockdown() then return end
+  local ok1 = pcall(SecureHandlerWrapScript, unlockBtn, "OnClick", header, UNLOCK_PRE)
+  local ok2 = pcall(SecureHandlerWrapScript, lockedBtn, "OnClick", header, LOCKED_PRE)
+  unlockWrapped = ok1 and ok2
+end
+
+-- the driver, with the combo lock clause in front when it applies
+local function aimDriver()
+  local on, form = ns.ComboLockSpec()
+  if not on then return AIM_DRIVER end
+  return "[combat,@target,harm,nodead" .. (form and (",form:" .. form) or "") .. "] combo; " .. AIM_DRIVER
+end
 
 ns.secureAimOK = false
 local driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
+local driverText
 
 function ns.ProbeSecureAim()
   if InCombatLockdown() then return end
@@ -384,7 +482,8 @@ end
 local function useHeader()
   local db = ns.db
   return ns.secureAimOK and db and db.leftAction == "INTERACTMOUSEOVER"
-    and ((db.leftEnemy or "interact") ~= "interact" or ns.FriendClickSpell() ~= nil)
+    and ((db.leftEnemy or "interact") ~= "interact" or ns.FriendClickSpell() ~= nil
+         or (ns.ComboLockSpec()))
 end
 ns.AimHeaderActive = function() return useHeader() and driverOn end
 
@@ -392,7 +491,16 @@ local function headerSync(off, autorun)
   if InCombatLockdown() then return end
   local db = ns.db
   local fresh = false
-  if not driverOn then RegisterStateDriver(header, "aim", AIM_DRIVER); driverOn = true; fresh = true end
+  local want = aimDriver()
+  if not driverOn or want ~= driverText then
+    RegisterStateDriver(header, "aim", want); driverOn = true; driverText = want; fresh = true
+  end
+  wrapUnlock()
+  local two = (db and (db.unlockClicks or 2) >= 2) and true or nil
+  if unlockBtn:GetAttribute("ctpi-two") ~= two then
+    unlockBtn:SetAttribute("ctpi-two", two)
+    unlockBtn:SetAttribute("ctpi-armed", nil)
+  end
   off, autorun = off and true or nil, autorun and true or nil
   local right = (db and CLICK_ACTIONS[db.rightAction]) and db.rightAction or nil
   local hard = (db and db.hardLock) and true or nil
@@ -414,6 +522,7 @@ end
 local function headerStop()
   if InCombatLockdown() or not driverOn then return end
   UnregisterStateDriver(header, "aim")
+  driverText = nil
   driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
   ClearOverrideBindings(header)
 end

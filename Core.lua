@@ -588,7 +588,9 @@ local defaults = {
   leftStopsAutorun = true,         -- while autorunning, left-click stops it (Secure.lua)
   leftEnemy    = "interact",       -- left-click on enemies: interact | lock | lockattack
   rogueOpeners = true,
-  hardLock     = true,             -- in combat, left-click sticks to your target; right-click unlocks             -- rogue + lockattack: stealth click = pick pocket / ambush (shift: sap / garrote)
+  hardLock     = true,             -- in combat, left-click sticks to your target; right-click unlocks
+  comboLock    = "auto",           -- nothing under the reticle steals your target in combat: auto (rogue, cat form) | on | off
+  unlockClicks = 2,                -- right-clicks in a row to unlock a locked target (1 or 2)
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in
@@ -971,6 +973,13 @@ SlashCmdList["CTPI"] = function(msg)
         or "|cFF00FF00no|r (should be mouselooking)"))
       p("left-click on enemies: " .. tostring(db.leftEnemy) .. "; in-combat click switching (loot / unlock / heal): "
         .. (ns.secureAimOK and "|cFF00FF00working|r" or "|cFFFF8800unavailable on this client (fallback)|r"))
+      if ns.ComboLockSpec then
+        local on, form = ns.ComboLockSpec()
+        p("combo lock (" .. tostring(db.comboLock or "auto") .. "): "
+          .. (on and ("|cFF00FF00active|r" .. (form and (" in form " .. form) or "")) or "off")
+          .. ", unlock takes " .. tostring(db.unlockClicks or 2) .. " right-click(s)"
+          .. ", aim driver state: " .. tostring(CTPIAimHeader and CTPIAimHeader:GetAttribute("state-aim")))
+      end
       local _, cls = UnitClass("player")
       local st, how = ns.PlayerStealthed()
       p("class " .. tostring(cls) .. ", stealthed: " .. tostring(st) .. " (" .. how .. ")"
