@@ -835,9 +835,9 @@ local function buildBehaviorPage(page)
     function(v) db.manageBackgroundFps = v; ns.ApplyBackgroundCap(); ns.ForceReconcile() end)
   cBk:SetPoint("TOPLEFT", cFocus, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cBk
-  local cDbg = makeCheck(page, "Debug window (live state + event log)",
-    function() return ns.debug and true or false end,
-    function(v) if ns.ToggleDebugWindow then ns.ToggleDebugWindow(v) end end)
+  local cDbg = makeCheck(page, "   Pressing Cmd frees it right away (Cmd-Tab, Cmd-Space)",
+    function() return db.cmdFrees ~= false end,
+    function(v) db.cmdFrees = v end)
   cDbg:SetPoint("TOPLEFT", cBk, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cDbg
 

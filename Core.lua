@@ -155,46 +155,84 @@ ns.RefreshFocusLimit = refreshLimit
 
 -- per-frame check, fed from the driver's OnUpdate. measures every frame's
 -- own duration instead of the game's 1-second fps average, so:
---   * focus counts as lost after ~half a second of background-speed frames
---   * it comes back after a quarter second of normal frames (a short grace,
---     so the click that brings the window back isn't swallowed by mouselook)
---   * one long frame (a hitch, a big pull) never trips it
+--   * pressing Cmd lets go right away (Cmd-Tab / Cmd-Space start with it)
+--   * otherwise focus counts as lost after ~half a second of
+--     background-speed frames; one long frame (a hitch) never trips it
+--   * it comes back only once frames are back to full speed AND you click
+--     or press a movement key in the game window (so the mouse is never
+--     re-grabbed while another app is in front)
 local slowFor, fastFor = 0, 0
+local metaWas, lostBy = false, nil
+
+local function lostAway(why)
+  focusLost, lostBy, fastFor = true, why, 0
+  if ns.debug and ns.Log then ns.Log("focus", "away: " .. why) end
+  ns.ForceReconcile()
+end
+
+-- signs you're actually using the game window again: a mouse button, or a
+-- movement / jump key. only the focused window gets these.
+local RESUME_KEYS = { "W", "A", "S", "D", "Q", "E", "SPACE", "UP", "DOWN", "LEFT", "RIGHT" }
+local function playerIsHere()
+  if IsMouseButtonDown and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")) then
+    return true
+  end
+  if IsKeyDown then
+    for _, k in ipairs(RESUME_KEYS) do
+      local ok, down = pcall(IsKeyDown, k)
+      if ok and down then return true end
+    end
+  end
+  return false
+end
 local function feedFrame(elapsed)
   local db = ns.db
   if not (db and db.unlockOnFocusLoss) or inLoadingScreen or GetTime() < suppressUntil then
-    slowFor, fastFor = 0, 0
-    if focusLost then focusLost = false end
+    slowFor, fastFor, metaWas = 0, 0, false
+    if focusLost then focusLost, lostBy = false, nil end
     return
   end
   if GetTime() - limitAt > 2 then refreshLimit() end
+
+  -- Cmd (Win on Windows) going down: about to Cmd-Tab / Cmd-Space / Cmd-H.
+  -- the press reaches the game before the switch happens, so this lets go
+  -- of the camera before macOS takes over instead of half a second after.
+  -- only a fresh press counts: the key-up usually lands in the other app,
+  -- so the game can think Cmd is still held when you come back.
+  local meta = db.cmdFrees ~= false and IsMetaKeyDown and IsMetaKeyDown() or false
+  if meta and not metaWas and not focusLost then
+    lostAway("Cmd pressed")
+  end
+  metaWas = meta
+
   if elapsed >= frameLimit then
     fastFor = 0
     slowFor = slowFor + elapsed
     if not focusLost and slowFor >= (db.focusDwell or 0.5) then
-      focusLost = true
-      if ns.debug then ns.Log("focus", string.format("focus lost (%.2fs of frames slower than %d fps)", slowFor, math.floor(1 / frameLimit + 0.5))) end
-      ns.ForceReconcile()
+      lostAway(string.format("%.2fs of frames slower than %d fps", slowFor, math.floor(1 / frameLimit + 0.5)))
     end
   else
     slowFor = 0
     if focusLost then
       fastFor = fastFor + elapsed
-      if fastFor >= 0.25 then
-        focusLost, fastFor = false, 0
-        if ns.debug then ns.Log("focus", "focus back") end
+      -- back at full speed AND you clicked or moved in the game window.
+      -- frame rate alone isn't enough: re-grabbing the mouse while macOS
+      -- still has another app in front is what made things go weird.
+      if fastFor >= 0.25 and playerIsHere() then
+        focusLost, lostBy, fastFor = false, nil, 0
+        if ns.debug then ns.Log("focus", "back (you clicked or moved)") end
         ns.ForceReconcile()
       end
     end
   end
 end
-local function updateFocusState() end
+local function updateFocusState() end   -- (kept for the loop; work happens per frame)
 -- for the debug window: current fps, the background threshold, how long
 -- frames have been slow, and whether focus counts as lost
 ns.FocusDebug = function()
   local fps = GetFramerate and GetFramerate() or 0
-  return math.floor(fps + 0.5), math.floor(1 / frameLimit + 0.5), slowFor, focusLost
-end   -- (kept for the loop; work happens per frame)
+  return math.floor(fps + 0.5), math.floor(1 / frameLimit + 0.5), slowFor, focusLost, lostBy
+end
 ns.SetLoadingScreen = function(v) inLoadingScreen = v end
 ns.SuppressFocusFor = function(sec) suppressUntil = GetTime() + (sec or 3) end
 
@@ -204,7 +242,7 @@ local function shouldFreeCursor()
   if not db.enabled then return true, "master toggle is off" end
   if ns.RadialOpen and ns.RadialOpen() then return true, "radial menu open" end
   if ns.freeCursorHeld then return true, "free-cursor key is toggled" end
-  if focusLost then return true, "window in background / minimized (fps heuristic)" end
+  if focusLost then return true, "away from the game (" .. tostring(lostBy) .. "); click or move to re-lock" end
   if ns.SpellTargeting() then return true, "placing a ground spell" end
   if ns.IsTyping() then return true, "typing / an edit box has focus" end
   if ns.CursorBusy() then return true, "something is on the cursor" end
@@ -604,6 +642,7 @@ local defaults = {
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
   focusDwell         = 0.5,        -- seconds of background-speed frames before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
+  cmdFrees     = true,             -- pressing Cmd (Win) frees the cursor right away: Cmd-Tab, Cmd-Space
   cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)

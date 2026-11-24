@@ -25,6 +25,14 @@
   default): your Target Nearest Enemy key unlocks a locked target, and
   otherwise targets what's under the reticle (or the nearest enemy when
   you're looking at nothing). It flips mid-combat along with the lock.
+- **Switching apps, reworked.** Pressing Cmd (Cmd-Tab, Cmd-Space, Cmd-H)
+  lets go of the camera immediately, before macOS switches, instead of
+  waiting to notice the frame rate drop. Coming back no longer re-grabs the
+  mouse on frame rate alone (it could grab it while another app was still in
+  front): the camera re-locks once you click or press a movement key in the
+  game window. "Pressing Cmd frees it" can be turned off (Behavior tab,
+  quick menu) if you use Cmd keybinds. The debug window shows why you're
+  counted as away and whether Cmd is down.
 - **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
   chat messages. The top half is a live readout (cursor locked or free and
   why, focus and fps, combat, target, combo points, what's under the
