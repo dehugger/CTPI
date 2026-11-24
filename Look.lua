@@ -98,10 +98,13 @@ local function clickHint(token)
     -- locked on your target: clicks wont switch to this one
     local armed = ns.UnlockArmed and ns.UnlockArmed()
     local two = (ns.db.unlockClicks or 2) >= 2
+    local tabKey = ns.TabKeys and ns.TabKeys()
     local unlockWord = armed and "Right-click again to unlock" or (two and "x2 Unlock" or "Unlock")
+    if tabKey and not armed then unlockWord = unlockWord .. " (or " .. tabKey .. ")" end
     if style == "text" then
       parts[#parts + 1] = "locked   " .. (armed and "right-click again: unlock"
         or (two and "right-click twice: unlock" or "right-click: unlock"))
+        .. (tabKey and ("   " .. tabKey:lower() .. ": unlock") or "")
     else
       local p = tex(LOCK_ICON, s)
       if style == "icons" then p = p .. " Locked" end

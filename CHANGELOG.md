@@ -14,6 +14,17 @@
   your target. The label shows "Right-click again to unlock" after the first.
   One-click unlock is a checkbox away.
 - `/ctpi why` shows the combo lock and the aim driver's current state.
+- **Cast on what you look at** (Class tab, `/ctpi reticle`): list spells
+  like Kick, Gouge, Blind, Sap and CTPI writes a macro for each that casts on
+  whatever's under the reticle without changing your target (falls back to
+  your target when you're looking at nothing), then swaps those macros onto
+  your bars where the plain spells were. Builders and finishers stay on your
+  target, so combo points stay put. "Spells back" / `/ctpi reticle undo`
+  reverses the swap. Defaults per class (interrupts and CC).
+- **Tab lock / unlock** (Behavior tab, quick menu, `/ctpi tab`, off by
+  default): your Target Nearest Enemy key unlocks a locked target, and
+  otherwise targets what's under the reticle (or the nearest enemy when
+  you're looking at nothing). It flips mid-combat along with the lock.
 - **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
   chat messages. The top half is a live readout (cursor locked or free and
   why, focus and fps, combat, target, combo points, what's under the

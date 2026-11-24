@@ -595,6 +595,7 @@ local defaults = {
   hardLock     = true,             -- in combat, left-click sticks to your target; right-click unlocks
   comboLock    = "auto",           -- nothing under the reticle steals your target in combat: auto (rogue, cat form) | on | off
   unlockClicks = 2,                -- right-clicks in a row to unlock a locked target (1 or 2)
+  tabLock      = false,            -- Tab: unlock while locked, else target what's under the reticle
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in
@@ -934,6 +935,20 @@ SlashCmdList["CTPI"] = function(msg)
     db.dialog.keys = not db.dialog.keys
     if ns.RefreshDialogKeys then ns.RefreshDialogKeys() end
     p("quest / gossip keys " .. (db.dialog.keys and "on" or "off"))
+
+  elseif cmd == "tab" then
+    if InCombatLockdown() then p("can't change that in combat"); return end
+    db.tabLock = not db.tabLock
+    if db.tabLock and ns.ResetTabKeys then ns.ResetTabKeys() end
+    ns.RefreshBindings()
+    p("Tab lock / unlock " .. (db.tabLock and "on" or "off"))
+
+  elseif cmd == "reticle" then
+    if rest:lower() == "undo" then
+      if ns.RestoreReticleSpells then ns.RestoreReticleSpells() end
+    else
+      if ns.PlaceReticleMacros then ns.PlaceReticleMacros() end
+    end
 
   elseif cmd == "radial" then
     db.radial.enabled = not db.radial.enabled

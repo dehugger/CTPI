@@ -518,8 +518,29 @@ local function buildClassPage(page)
   friendRow:SetPoint("TOPLEFT", cFriend, "BOTTOMLEFT", 4, -2)
   controls[#controls+1] = friendRow
 
+  -- ---- reticle casts ----
+  local hRet = sectionHeader(page, "Cast on what you look at (keeps your target)", friendRow, -14)
+  local retRow = makeEditRow(page, "Spells", 270,
+    function() return ns.ReticleList and ns.ReticleList() or "" end,
+    function(v) local c = cfg(); if c then c.reticle = v end end, 44)
+  retRow:SetPoint("TOPLEFT", hRet, "BOTTOMLEFT", 0, -4)
+  controls[#controls+1] = retRow
+  local retPut = makeButton(page, "Put on my bars", 112, function()
+    if ns.PlaceReticleMacros then ns.PlaceReticleMacros() end
+  end)
+  retPut:SetPoint("TOPLEFT", retRow, "BOTTOMLEFT", 0, -4)
+  local retBack = makeButton(page, "Spells back", 90, function()
+    if ns.RestoreReticleSpells then ns.RestoreReticleSpells() end
+  end)
+  retBack:SetPoint("LEFT", retPut, "RIGHT", 6, 0)
+  local retNote = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  retNote:SetPoint("LEFT", retBack, "RIGHT", 8, 0)
+  retNote:SetPoint("RIGHT", page, "RIGHT", 0, 0)
+  retNote:SetJustifyH("LEFT"); retNote:SetWordWrap(true)
+  retNote:SetText("comma list; swaps CT: macros in for these spells")
+
   -- ---- radial ----
-  local hRad = sectionHeader(page, "Radial menu (hold the modifier)", friendRow, -14)
+  local hRad = sectionHeader(page, "Radial menu (hold the modifier)", retPut, -12)
   local cRad = makeCheck(page, "Enabled",
     function() return db.radial.enabled end,
     function(v)
@@ -620,10 +641,9 @@ local function buildClassPage(page)
   help:SetPoint("RIGHT", page, "RIGHT", 0, 0)
   help:SetJustifyH("LEFT"); help:SetWordWrap(true)
   help.Reload = function(self)
-    self:SetText("Slots: a spell name, or a full /macro line. Unknown spells are skipped. "
-      .. "Condition: macro conditions like [stealth], [combat], [{cat}], [{bear}], "
-      .. "[{moonkin}], or blank for the default ring. The first matching ring opens. "
-      .. "Your current form / stance: " .. tostring(ns.CurrentFormIndex and ns.CurrentFormIndex() or 0) .. ".")
+    self:SetText("Slots: a spell name or a /macro line. Condition: [stealth], [combat], [{cat}], "
+      .. "[{bear}]... or blank for the default ring; first match opens. "
+      .. "Current form / stance: " .. tostring(ns.CurrentFormIndex and ns.CurrentFormIndex() or 0) .. ".")
   end
   help:Reload()
   controls[#controls+1] = help
@@ -763,7 +783,18 @@ local function buildBehaviorPage(page)
   cTwo:SetPoint("TOPLEFT", comboLbl, "BOTTOMLEFT", -4, -10)
   controls[#controls+1] = cTwo
 
-  local rightLbl = smallLabel(page, "Right-click", cTwo, 4, -8)
+  local cTab = makeCheck(page, "Tab: unlocks a locked target, else targets what you look at",
+    function() return db.tabLock end,
+    function(v)
+      if InCombatLockdown() then return end
+      db.tabLock = v
+      if v and ns.ResetTabKeys then ns.ResetTabKeys() end
+      ns.RefreshBindings()
+    end)
+  cTab:SetPoint("TOPLEFT", cTwo, "BOTTOMLEFT", 0, -2)
+  controls[#controls+1] = cTab
+
+  local rightLbl = smallLabel(page, "Right-click", cTab, 4, -8)
   local rightBtns, rightRepaint = makeChoiceRow(page, CLICK_CHOICES,
     function() return db.rightAction end,
     function(v) db.rightAction = v; ns.RefreshBindings() end)

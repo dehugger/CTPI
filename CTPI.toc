@@ -16,6 +16,7 @@ Compat.lua
 Profiles.lua
 Core.lua
 Secure.lua
+Reticle.lua
 Camera.lua
 Look.lua
 HUD.lua

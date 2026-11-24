@@ -69,6 +69,8 @@ local ROWS = {
   { label = "Left-click on enemies", path = "leftEnemy", after = rebind, combat = true,
     cycle = { { "interact", "Interact" }, { "lock", "Lock" }, { "lockattack", "Lock + attack" } } },
   { label = "Hard lock in combat", path = "hardLock", after = rebind, combat = true },
+  { label = "Tab unlocks / targets", path = "tabLock", combat = true,
+    after = function() if ns.ResetTabKeys and ns.db.tabLock then ns.ResetTabKeys() end; rebind() end },
   { label = "Combo lock", path = "comboLock", after = rebind, combat = true,
     cycle = { { "auto", "Auto" }, { "on", "On" }, { "off", "Off" } } },
   { label = "Rogue stealth openers", path = "rogueOpeners", after = rebind },

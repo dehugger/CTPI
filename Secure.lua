@@ -112,6 +112,20 @@ unlockBtn:RegisterForClicks("AnyUp", "AnyDown")
 unlockBtn:SetAttribute("type", "macro")
 unlockBtn:SetAttribute("macrotext", "/cleartarget")
 
+-- Tab (db.tabLock): whatever key you have on "Target Nearest Enemy" becomes
+--   locked on a target  -> unlock (clear it)
+--   otherwise           -> target what's under the reticle, else the nearest enemy
+-- bound by the aim header below, so it flips mid-combat with the lock
+local tabLockBtn = CreateFrame("Button", "CTPITabLockButton", UIParent, "SecureActionButtonTemplate")
+tabLockBtn:RegisterForClicks("AnyUp", "AnyDown")
+tabLockBtn:SetAttribute("type", "macro")
+tabLockBtn:SetAttribute("macrotext", "/target [@mouseover,harm,nodead] mouseover\n"
+  .. "/targetenemy [@mouseover,noexists][@mouseover,noharm][@mouseover,dead]")
+local tabUnlockBtn = CreateFrame("Button", "CTPITabUnlockButton", UIParent, "SecureActionButtonTemplate")
+tabUnlockBtn:RegisterForClicks("AnyUp", "AnyDown")
+tabUnlockBtn:SetAttribute("type", "macro")
+tabUnlockBtn:SetAttribute("macrotext", "/cleartarget")
+
 -- two-tap unlock: the first right-click only arms it, the second (with no
 -- left-click in between) clears the target. a stray right-click in a group
 -- fight shouldnt cost you your combo points. counted on the press only, and
@@ -444,6 +458,11 @@ header:SetAttribute("apply", [[
   else
     self:ClearBinding("BUTTON2")
   end
+  -- Tab: unlock while locked, else lock onto what you're looking at
+  local tabBtn = (st == "locked") and "CTPITabUnlockButton" or "CTPITabLockButton"
+  local t1, t2 = self:GetAttribute("ctpi-tab1"), self:GetAttribute("ctpi-tab2")
+  if t1 then self:SetBindingClick(true, t1, tabBtn) end
+  if t2 then self:SetBindingClick(true, t2, tabBtn) end
 ]])
 header:SetAttribute("_onstate-aim", [[ self:RunAttribute("apply", newstate) ]])
 SecureHandlerSetFrameRef(header, "unlock", unlockBtn)
@@ -465,7 +484,20 @@ end
 
 ns.secureAimOK = false
 local driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
-local driverText
+local driverText, hTab
+-- the keys on "Target Nearest Enemy" (cached: once Tab is overridden the
+-- lookup may stop finding it)
+local tabKeys = {}
+local function refreshTabKeys()
+  local k1, k2 = GetBindingKey("TARGETNEARESTENEMY")
+  if k1 then tabKeys = { k1, k2 } end
+end
+function ns.ResetTabKeys() tabKeys = {} end
+function ns.TabKeys()
+  local db = ns.db
+  if not (db and db.tabLock) then return nil end
+  return tabKeys[1], tabKeys[2]
+end
 
 function ns.ProbeSecureAim()
   if InCombatLockdown() then return end
@@ -483,7 +515,7 @@ local function useHeader()
   local db = ns.db
   return ns.secureAimOK and db and db.leftAction == "INTERACTMOUSEOVER"
     and ((db.leftEnemy or "interact") ~= "interact" or ns.FriendClickSpell() ~= nil
-         or (ns.ComboLockSpec()))
+         or (ns.ComboLockSpec()) or db.tabLock)
 end
 ns.AimHeaderActive = function() return useHeader() and driverOn end
 
@@ -506,9 +538,20 @@ local function headerSync(off, autorun)
   local hard = (db and db.hardLock) and true or nil
   local enemy = (db and (db.leftEnemy or "interact") ~= "interact") and true or nil
   local friend = ns.FriendClickSpell() and true or nil
+  if db and db.tabLock and not tabKeys[1] then refreshTabKeys() end
+  local t1, t2 = nil, nil
+  if db and db.tabLock then t1, t2 = tabKeys[1], tabKeys[2] end
+  local tabSig = tostring(t1) .. "/" .. tostring(t2)
+  if tabSig ~= hTab then
+    -- keys changed: start from a clean slate so the old ones go back to native
+    if hTab ~= nil then ClearOverrideBindings(header) end
+    fresh = true
+  end
   if fresh or off ~= hOff or autorun ~= hAuto or right ~= hRight or hard ~= hHard
-     or enemy ~= hEnemy or friend ~= hFriend then
-    hOff, hAuto, hRight, hHard, hEnemy, hFriend = off, autorun, right, hard, enemy, friend
+     or enemy ~= hEnemy or friend ~= hFriend or tabSig ~= hTab then
+    hOff, hAuto, hRight, hHard, hEnemy, hFriend, hTab = off, autorun, right, hard, enemy, friend, tabSig
+    header:SetAttribute("ctpi-tab1", t1)
+    header:SetAttribute("ctpi-tab2", t2)
     header:SetAttribute("ctpi-enemy", enemy)
     header:SetAttribute("ctpi-friend", friend)
     header:SetAttribute("ctpi-off", off)
@@ -522,7 +565,7 @@ end
 local function headerStop()
   if InCombatLockdown() or not driverOn then return end
   UnregisterStateDriver(header, "aim")
-  driverText = nil
+  driverText, hTab = nil, nil
   driverOn, hOff, hAuto, hRight, hHard, hEnemy, hFriend = false, nil, nil, nil, nil, nil, nil
   ClearOverrideBindings(header)
 end

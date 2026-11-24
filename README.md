@@ -111,6 +111,8 @@ toggle, free cursor, quick menu. The setup can set these for you.
 /ctpi menu                quick toggles
 /ctpi toggle              master on / off
 /ctpi radial              radial menu on / off
+/ctpi tab                 Tab unlocks a locked target, else targets what you look at
+/ctpi reticle [undo]      put the reticle-cast macros on your bars (undo: spells back)
 /ctpi left|right <interact|run|autorun|none>
 /ctpi leftenemy <interact|lock|lockattack>
 /ctpi shoulder [off|always|cursor|target]

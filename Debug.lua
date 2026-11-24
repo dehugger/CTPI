@@ -51,6 +51,8 @@ local CLICK_NAMES = {
   CTPIEnemyLockedButton = "LOCKED (act on target)",
   CTPIFriendClickButton = "friend click (heal)",
   CTPIUnlockButton      = "unlock (clear target)",
+  CTPITabLockButton     = "tab: target what you look at",
+  CTPITabUnlockButton   = "tab: unlock (clear target)",
 }
 local function bindingName(key)
   local a = GetBindingAction and GetBindingAction(key, true)
@@ -106,6 +108,8 @@ local function stateText()
 
   add("left-click", bindingName("BUTTON1"))
   add("right-click", bindingName("BUTTON2"))
+  local tk = ns.TabKeys and ns.TabKeys()
+  if tk then add(tk, bindingName(tk)) end
   local aim = CTPIAimHeader and CTPIAimHeader:GetAttribute("state-aim")
   add("aim driver", (ns.AimHeaderActive and ns.AimHeaderActive()) and tostring(aim)
     or ("|cFF888888off|r" .. (ns.secureAimOK and "" or " (secure path unavailable)")))
@@ -142,6 +146,8 @@ local function poll()
   end)
   watch("b1", bindingName("BUTTON1"), "bind", function(v) return "left-click -> " .. v end)
   watch("b2", bindingName("BUTTON2"), "bind", function(v) return "right-click -> " .. v end)
+  local tk = ns.TabKeys and ns.TabKeys()
+  if tk then watch("tab", bindingName(tk), "bind", function(v) return tk .. " -> " .. v end) end
   local aim = CTPIAimHeader and CTPIAimHeader:GetAttribute("state-aim") or "-"
   watch("aim", tostring(aim), "bind", function(v) return "aim driver state: " .. v end)
   watch("armed", (ns.UnlockArmed and ns.UnlockArmed()) and "yes" or "no", "click", function(v)
