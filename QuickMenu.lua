@@ -107,9 +107,9 @@ local ROWS = {
   { section = "Cursor" },
   { label = "Unlock when window loses focus", path = "unlockOnFocusLoss",
     after = function() if ns.ApplyBackgroundCap then ns.ApplyBackgroundCap() end; ns.ForceReconcile() end },
-  { label = "Debug messages",
+  { label = "Debug window",
     get = function() return ns.debug end,
-    set = function() ns.debug = not ns.debug; ns.lastWhy = false end },
+    set = function() if ns.ToggleDebugWindow then ns.ToggleDebugWindow() end end },
   { label = "Minimap button", path = "minimap.show",
     after = function() if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end end },
 }

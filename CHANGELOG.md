@@ -14,6 +14,15 @@
   your target. The label shows "Right-click again to unlock" after the first.
   One-click unlock is a checkbox away.
 - `/ctpi why` shows the combo lock and the aim driver's current state.
+- **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
+  chat messages. The top half is a live readout (cursor locked or free and
+  why, focus and fps, combat, target, combo points, what's under the
+  reticle, what left- and right-click are bound to right now, the aim
+  driver's state, combo / hard lock, the radial). The bottom half logs every
+  change with a timestamp: cursor lock / free, binding swaps, target swaps,
+  which CTPI button a click fired, combat, focus lost / back, the radial.
+  Copy puts the state and log in a box to Cmd-C. It doesn't free the cursor,
+  and it reopens after a /reload if it was open.
 
 ## 3.0.1
 

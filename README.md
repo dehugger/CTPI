@@ -121,7 +121,7 @@ toggle, free cursor, quick menu. The setup can set these for you.
 /ctpi minimap             show / hide the minimap button
 /ctpi block|unblock <FrameName>
 /ctpi why                 explain what the cursor and clicks are doing
-/ctpi debug               chat messages for every lock / free change
+/ctpi debug               debug window: live state + a log of every change
 /ctpi reset               restore defaults
 ```
 

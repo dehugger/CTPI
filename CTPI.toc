@@ -23,4 +23,5 @@ Dialog.lua
 Radial.lua
 UI.lua
 QuickMenu.lua
+Debug.lua
 Setup.lua

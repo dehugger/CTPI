@@ -804,9 +804,9 @@ local function buildBehaviorPage(page)
     function(v) db.manageBackgroundFps = v; ns.ApplyBackgroundCap(); ns.ForceReconcile() end)
   cBk:SetPoint("TOPLEFT", cFocus, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cBk
-  local cDbg = makeCheck(page, "Debug messages in chat (why the cursor frees)",
+  local cDbg = makeCheck(page, "Debug window (live state + event log)",
     function() return ns.debug and true or false end,
-    function(v) ns.debug = v; ns.lastWhy = false end)
+    function(v) if ns.ToggleDebugWindow then ns.ToggleDebugWindow(v) end end)
   cDbg:SetPoint("TOPLEFT", cBk, "BOTTOMLEFT", 0, -2)
   controls[#controls+1] = cDbg
 

@@ -300,7 +300,7 @@ function ns.UpdateLook(looking)
     lastDbg = token
     local n = token and UnitName(token)
     if ns.IsSecret(n) then n = "<secret>" end
-    print("|cFFc8a25eCTPI|r look -> " .. (token and (token .. " = " .. tostring(n)) or "nothing"))
+    ns.Log("look", "looking at " .. (token and (token .. " = " .. tostring(n)) or "nothing"))
   end
 
   -- compact

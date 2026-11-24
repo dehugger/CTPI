@@ -173,6 +173,7 @@ local function feedFrame(elapsed)
     slowFor = slowFor + elapsed
     if not focusLost and slowFor >= (db.focusDwell or 0.5) then
       focusLost = true
+      if ns.debug then ns.Log("focus", string.format("focus lost (%.2fs of frames slower than %d fps)", slowFor, math.floor(1 / frameLimit + 0.5))) end
       ns.ForceReconcile()
     end
   else
@@ -181,12 +182,19 @@ local function feedFrame(elapsed)
       fastFor = fastFor + elapsed
       if fastFor >= 0.25 then
         focusLost, fastFor = false, 0
+        if ns.debug then ns.Log("focus", "focus back") end
         ns.ForceReconcile()
       end
     end
   end
 end
-local function updateFocusState() end   -- (kept for the loop; work happens per frame)
+local function updateFocusState() end
+-- for the debug window: current fps, the background threshold, how long
+-- frames have been slow, and whether focus counts as lost
+ns.FocusDebug = function()
+  local fps = GetFramerate and GetFramerate() or 0
+  return math.floor(fps + 0.5), math.floor(1 / frameLimit + 0.5), slowFor, focusLost
+end   -- (kept for the loop; work happens per frame)
 ns.SetLoadingScreen = function(v) inLoadingScreen = v end
 ns.SuppressFocusFor = function(sec) suppressUntil = GetTime() + (sec or 3) end
 
@@ -435,7 +443,7 @@ local function engage()
   if not IsMouselooking() then MouselookStart() end
   if ns.debug and not warnedML and not IsMouselooking() then
     warnedML = true
-    print("|cFFc8a25eCTPI|r MouselookStart() was called but IsMouselooking() is still false")
+    ns.Log("cursor", "MouselookStart() was called but IsMouselooking() is still false")
   end
   updateReticle(true)
   ns.ApplyClickBindings()   -- Secure.lua (no-op in combat)
@@ -492,10 +500,6 @@ driver:SetScript("OnUpdate", function(self, elapsed)
   if not ns.db then return end
   updateFocusState()        -- heuristic window-focus check (cheap)
   local free, why = shouldFreeCursor()
-  if ns.debug and why ~= ns.lastWhy then   -- /ctpi debug: narrate state changes
-    ns.lastWhy = why
-    print("|cFFc8a25eCTPI|r cursor " .. (free and ("free: " .. why) or "locked (mouselook)"))
-  end
   if free then
     if IsMouselooking() then disengage() end
   else
@@ -959,9 +963,7 @@ SlashCmdList["CTPI"] = function(msg)
     p("minimap button " .. (db.minimap.show and "shown" or "hidden"))
 
   elseif cmd == "debug" then
-    ns.debug = not ns.debug
-    ns.lastWhy = false   -- force the next state to print
-    p("debug " .. (ns.debug and "on (prints every cursor lock/free change)" or "off"))
+    if ns.ToggleDebugWindow then ns.ToggleDebugWindow() end
 
   elseif cmd == "why" then
     -- deferred: while the slash runs, the chat box is still active, which

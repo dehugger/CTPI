@@ -473,7 +473,7 @@ function ns.ProbeSecureAim()
   local ok = pcall(SecureHandlerExecute, header, [[ self:SetAttribute("ctpi-probe", "ok") ]])
   ns.secureAimOK = (ok and header:GetAttribute("ctpi-probe") == "ok") and true or false
   if ns.debug then
-    print("|cFFc8a25eCTPI|r secure aim (loot in combat): " .. (ns.secureAimOK and "working" or "unavailable, using fallback"))
+    ns.Log("info", "secure aim (loot in combat): " .. (ns.secureAimOK and "working" or "unavailable, using fallback"))
   end
 end
 
