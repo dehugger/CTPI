@@ -21,16 +21,10 @@
   your bars where the plain spells were. Builders and finishers stay on your
   target, so combo points stay put. "Spells back" / `/ctpi reticle undo`
   reverses the swap. Defaults per class (interrupts and CC).
-- **Ground spells at the crosshair** (Class tab "Ground" list, rogue default
-  Distract): "Put on my bars" also swaps in `/cast [@cursor]` macros for
-  these, and while the camera is locked CTPI keeps the game's cursor
-  centering on, so the hidden cursor sits on the crosshair and the spell
-  lands where you're looking, no placing. Your own centering settings come
-  back when the camera lets go and on logout. Ground spells not on the list
-  still free the cursor to place them by hand.
-- **Cursor reappears: On the reticle** (quick menu, `/ctpi cursor reticle`):
-  when the camera lets go, the cursor shows up on the reticle instead of
-  wherever it was when the camera locked.
+- The cursor-centering option ("Cursor reappears: Centered") is gone: the
+  game's cursor centering has been broken since patch 10.2 (a visible mini
+  cursor while the camera is locked, drift, camera jolts). If you had it
+  on, CTPI switches you to "Where it was".
 - **Flip camera 180** as a click choice (left, right, Shift-click,
   Shift-right-click), using the game's own Flip Camera.
 - **Tab lock / unlock** (Behavior tab, quick menu, `/ctpi tab`, off by

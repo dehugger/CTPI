@@ -352,8 +352,6 @@ local function refreshReticle()
   if ns.LayoutCombo then ns.LayoutCombo() end   -- ring inside the arc, or row above
   if ns.LayoutHUD then ns.LayoutHUD() end
   if ns.LayoutLook then ns.LayoutLook() end
-  -- "on the reticle" cursor follows the reticle's height
-  if ns.db.cursorReturn == "reticle" and ns.ApplyCursorReturn then ns.ApplyCursorReturn() end
 end
 ns.RefreshReticle = refreshReticle
 
@@ -480,36 +478,32 @@ ns.UpdateCombo = updateCombo
 -- ---------------------------------------------------------------------
 -- The reconciliation loop
 -- ---------------------------------------------------------------------
--- ground spells at the crosshair (Reticle.lua): while the camera is locked,
--- the game's cursor centering holds the hidden cursor on the crosshair, so
--- /cast [@cursor] lands where you're looking. your own centering values
--- are saved and put back when the camera lets go (and on logout).
-local aimCenterOn = false
-function ns.SetAimCentering(on)
+-- (3.1.0 dev builds turned the game's cursor centering on to aim ground
+-- spells at the crosshair and to bring the cursor back on the reticle.
+-- that centering is broken in the game since 10.2: a visible mini cursor
+-- while locked, drift, camera jolts. both features are gone; this puts
+-- back any values they changed.)
+local function undoDevCentering()
   local db = ns.db
   if not db then return end
-  if on and not aimCenterOn then
-    if db.savedAimCentering == nil then
-      db.savedAimCentering = ns.GetCVar("CursorFreelookCentering") or "0"
-      db.savedAimYPos = ns.GetCVar("CursorCenteredYPos") or "0.5"
-    end
-    pcall(ns.SetCVar, "CursorCenteredYPos", ns.ReticleYFraction())
-    pcall(ns.SetCVar, "CursorFreelookCentering", 1)
-    aimCenterOn = true
-  elseif not on and (aimCenterOn or db.savedAimCentering ~= nil) then
-    aimCenterOn = false
-    if db.savedAimCentering ~= nil then
-      pcall(ns.SetCVar, "CursorFreelookCentering", db.savedAimCentering)
-      pcall(ns.SetCVar, "CursorCenteredYPos", db.savedAimYPos or "0.5")
-      db.savedAimCentering, db.savedAimYPos = nil, nil
-    end
-    ns.ApplyCursorReturn()
+  if db.savedAimCentering ~= nil then
+    pcall(ns.SetCVar, "CursorFreelookCentering", db.savedAimCentering)
+    db.savedAimCentering = nil
   end
+  if db.savedAimYPos ~= nil then
+    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedAimYPos)
+    db.savedAimYPos = nil
+  end
+  if db.savedCursorYPos ~= nil then
+    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
+    db.savedCursorYPos = nil
+  end
+  db.groundAim = nil
 end
+ns.UndoDevCentering = undoDevCentering
 
 local warnedML = false
 local function engage()
-  if ns.db.groundAim and ns.db.enabled then ns.SetAimCentering(true) end
   if not IsMouselooking() then MouselookStart() end
   if ns.debug and not warnedML and not IsMouselooking() then
     warnedML = true
@@ -534,18 +528,9 @@ ns.RecordFreeCursor = recordFreeCursor
 -- cursor when the camera lets go (db.cursorReturn):
 --   "game"   leave the game's setting alone
 --   "stay"   reappear where it was (CursorFreelookCentering 0)
---   "center"  the game's centering (CursorFreelookCentering 1)
---   "reticle" centered, at the reticle's height (CursorCenteredYPos)
--- the game centers the hidden cursor when the camera locks, so it comes
--- back there when the camera lets go, wherever it was before.
--- your own values are saved and put back on logout or when set to "game"
-function ns.ReticleYFraction()
-  local _, cy = CTPIReticle and CTPIReticle:GetCenter()
-  local h = UIParent:GetHeight()
-  if cy and h and h > 0 then return math.max(0.01, math.min(0.99, cy / h)) end
-  return 0.5
-end
-
+-- (no "centered" option: the game's centering has been broken since 10.2,
+-- see undoDevCentering above)
+-- your own value is saved and put back on logout or when set to "game"
 function ns.ApplyCursorReturn()
   local db = ns.db
   if not db then return end
@@ -555,34 +540,18 @@ function ns.ApplyCursorReturn()
       pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
       db.savedCursorCentering = nil
     end
-    if db.savedCursorYPos ~= nil then
-      pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
-      db.savedCursorYPos = nil
-    end
     return
   end
   if db.savedCursorCentering == nil then
     db.savedCursorCentering = ns.GetCVar("CursorFreelookCentering") or "0"
   end
-  if mode == "reticle" then
-    if db.savedCursorYPos == nil then
-      db.savedCursorYPos = ns.GetCVar("CursorCenteredYPos") or "0.5"
-    end
-    pcall(ns.SetCVar, "CursorCenteredYPos", ns.ReticleYFraction())
-  elseif db.savedCursorYPos ~= nil then
-    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
-    db.savedCursorYPos = nil
-  end
-  pcall(ns.SetCVar, "CursorFreelookCentering", (mode == "center" or mode == "reticle") and 1 or 0)
+  pcall(ns.SetCVar, "CursorFreelookCentering", 0)
 end
 
 local function disengage()
   if IsMouselooking() then
     MouselookStop()
-    C_Timer.After(0, function()
-      recordFreeCursor()
-      if not IsMouselooking() then ns.SetAimCentering(false) end
-    end)
+    C_Timer.After(0, recordFreeCursor)
   end
   updateReticle(false)
   if ns.UpdateLook then ns.UpdateLook(false) end
@@ -704,7 +673,7 @@ local defaults = {
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
   focusDwell         = 0.5,        -- seconds of background-speed frames before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
-  cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center | reticle
+  cursorReturn = "game",           -- cursor when the camera lets go: game | stay
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
   clearFocusKey      = "",          -- clear focus ("" = unbound)
@@ -842,6 +811,10 @@ function handlers:ADDON_LOADED(_, name)
 
   copyDefaults(CTPIDB, defaults)
   CTPIDB.cmdFrees = nil   -- 3.1.0 dev setting, removed
+  -- the centered cursor modes rode on the game's broken centering
+  if CTPIDB.cursorReturn == "center" or CTPIDB.cursorReturn == "reticle" then
+    CTPIDB.cursorReturn = "stay"
+  end
   -- dev builds labeled clear-target "Unlock"; it was meant to free the cursor
   if not CTPIDB.shiftUnlockV2 then
     CTPIDB.shiftUnlockV2 = true
@@ -862,6 +835,7 @@ function handlers:PLAYER_LOGIN()
   end
   applySoftTarget()
   ns.ApplyBackgroundCap()
+  undoDevCentering()
   ns.ApplyCursorReturn()
   buildReticleFrame()
   buildComboFrame()
@@ -901,11 +875,7 @@ function handlers:ADDON_ACTION_FORBIDDEN(e, who, fn) reportBlocked(e, who, fn) e
 function handlers:PLAYER_LOGOUT()
   ns.RestoreBackgroundCap()
   local db = ns.db
-  if ns.SetAimCentering then ns.SetAimCentering(false) end
-  if db and db.savedCursorYPos ~= nil then
-    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
-    db.savedCursorYPos = nil
-  end
+  undoDevCentering()
   if db and db.savedCursorCentering ~= nil then   -- put your own value back
     pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
     db.savedCursorCentering = nil
@@ -1072,8 +1042,8 @@ SlashCmdList["CTPI"] = function(msg)
 
   elseif cmd == "cursor" then
     local v = rest:lower()
-    if v ~= "game" and v ~= "stay" and v ~= "center" and v ~= "reticle" then
-      p("usage: /ctpi cursor <game|stay|center|reticle>  (now: " .. tostring(db.cursorReturn or "game") .. ")"); return
+    if v ~= "game" and v ~= "stay" then
+      p("usage: /ctpi cursor <game|stay>  (now: " .. tostring(db.cursorReturn or "game") .. ")"); return
     end
     db.cursorReturn = v
     ns.ApplyCursorReturn()

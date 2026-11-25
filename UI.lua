@@ -525,16 +525,10 @@ local function buildClassPage(page)
     function(v) local c = cfg(); if c then c.reticle = v end end, 44)
   retRow:SetPoint("TOPLEFT", hRet, "BOTTOMLEFT", 0, -4)
   controls[#controls+1] = retRow
-  -- ground spells (Distract...): cast at the crosshair
-  local gndRow = makeEditRow(page, "Ground", 270,
-    function() return ns.GroundList and ns.GroundList() or "" end,
-    function(v) local c = cfg(); if c then c.ground = v end end, 44)
-  gndRow:SetPoint("TOPLEFT", retRow, "BOTTOMLEFT", 0, -2)
-  controls[#controls+1] = gndRow
   local retPut = makeButton(page, "Put on my bars", 112, function()
     if ns.PlaceReticleMacros then ns.PlaceReticleMacros() end
   end)
-  retPut:SetPoint("TOPLEFT", gndRow, "BOTTOMLEFT", 0, -4)
+  retPut:SetPoint("TOPLEFT", retRow, "BOTTOMLEFT", 0, -4)
   local retBack = makeButton(page, "Spells back", 90, function()
     if ns.RestoreReticleSpells then ns.RestoreReticleSpells() end
   end)
@@ -543,7 +537,7 @@ local function buildClassPage(page)
   retNote:SetPoint("LEFT", retBack, "RIGHT", 8, 0)
   retNote:SetPoint("RIGHT", page, "RIGHT", 0, 0)
   retNote:SetJustifyH("LEFT"); retNote:SetWordWrap(true)
-  retNote:SetText("Spells: what you look at. Ground: at the crosshair.")
+  retNote:SetText("comma list; swaps CT: macros in for these spells")
 
   -- ---- radial ----
   local hRad = sectionHeader(page, "Radial menu (hold the modifier, or Shift-click: Radial)", retPut, -12)

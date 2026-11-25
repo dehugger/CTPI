@@ -111,10 +111,9 @@ local function stateText()
     local sc = UIParent:GetEffectiveScale()
     local w, h = UIParent:GetWidth() * sc, UIParent:GetHeight() * sc
     if x and w > 0 and h > 0 then
-      add("cursor", string.format("%d%% across, %d%% up   ground aim %s (centering %s, y %s)",
+      add("cursor", string.format("%d%% across, %d%% up   game centering %s, sticky %s",
         math.floor(x / w * 100 + 0.5), math.floor(y / h * 100 + 0.5),
-        yn(ns.db.groundAim, "on", "off"), tostring(ns.GetCVar("CursorFreelookCentering")),
-        tostring(ns.GetCVar("CursorCenteredYPos"))))
+        tostring(ns.GetCVar("CursorFreelookCentering")), tostring(ns.GetCVar("CursorStickyCentering"))))
     end
   end
   add("target", unitDesc("target"))
