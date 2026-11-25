@@ -94,9 +94,8 @@ local function stateText()
     .. "   cursor " .. (free and ("|cFFff8800free|r: " .. why) or "|cFF66dd88locked|r"))
   if ns.FocusDebug then
     local fps, thr, slow, lost, by = ns.FocusDebug()
-    add("focus", string.format("%s   fps %d (bg below %d)   slow for %.2fs   Cmd %s",
-      lost and ("|cFFff8800AWAY|r (" .. tostring(by) .. ")") or "|cFF66dd88here|r", fps, thr, slow,
-      (IsMetaKeyDown and IsMetaKeyDown()) and "down" or "up"))
+    add("focus", string.format("%s   fps %d (bg below %d)   slow for %.2fs",
+      lost and ("|cFFff8800AWAY|r (" .. tostring(by) .. ")") or "|cFF66dd88here|r", fps, thr, slow))
   end
   add("combat", yn(InCombatLockdown()) .. "   stealth " .. yn((ns.PlayerStealthed())) .. "   form "
     .. tostring(plain(GetShapeshiftForm and GetShapeshiftForm())))

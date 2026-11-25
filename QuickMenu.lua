@@ -109,7 +109,6 @@ local ROWS = {
   { section = "Cursor" },
   { label = "Unlock when window loses focus", path = "unlockOnFocusLoss",
     after = function() if ns.ApplyBackgroundCap then ns.ApplyBackgroundCap() end; ns.ForceReconcile() end },
-  { label = "Cmd frees the cursor", path = "cmdFrees" },
   { label = "Debug window",
     get = function() return ns.debug end,
     set = function() if ns.ToggleDebugWindow then ns.ToggleDebugWindow() end end },

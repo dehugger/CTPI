@@ -155,18 +155,20 @@ ns.RefreshFocusLimit = refreshLimit
 
 -- per-frame check, fed from the driver's OnUpdate. measures every frame's
 -- own duration instead of the game's 1-second fps average, so:
---   * pressing Cmd lets go right away (Cmd-Tab / Cmd-Space start with it)
---   * otherwise focus counts as lost after ~half a second of
+--   * focus counts as lost after ~half a second of
 --     background-speed frames; one long frame (a hitch) never trips it
 --   * it comes back only once frames are back to full speed AND you click
 --     or press a movement key in the game window (so the mouse is never
 --     re-grabbed while another app is in front)
 local slowFor, fastFor = 0, 0
-local metaWas, lostBy = false, nil
+local lostBy = nil
 
 local function lostAway(why)
   focusLost, lostBy, fastFor = true, why, 0
-  if ns.debug and ns.Log then ns.Log("focus", "away: " .. why) end
+  -- whether the game had already let go of the mouse on its own by now
+  if ns.debug and ns.Log then
+    ns.Log("focus", "away: " .. why .. " (mouselook still on: " .. tostring(IsMouselooking()) .. ")")
+  end
   ns.ForceReconcile()
 end
 
@@ -188,22 +190,15 @@ end
 local function feedFrame(elapsed)
   local db = ns.db
   if not (db and db.unlockOnFocusLoss) or inLoadingScreen or GetTime() < suppressUntil then
-    slowFor, fastFor, metaWas = 0, 0, false
+    slowFor, fastFor = 0, 0
     if focusLost then focusLost, lostBy = false, nil end
     return
   end
   if GetTime() - limitAt > 2 then refreshLimit() end
 
-  -- Cmd (Win on Windows) going down: about to Cmd-Tab / Cmd-Space / Cmd-H.
-  -- the press reaches the game before the switch happens, so this lets go
-  -- of the camera before macOS takes over instead of half a second after.
-  -- only a fresh press counts: the key-up usually lands in the other app,
-  -- so the game can think Cmd is still held when you come back.
-  local meta = db.cmdFrees ~= false and IsMetaKeyDown and IsMetaKeyDown() or false
-  if meta and not metaWas and not focusLost then
-    lostAway("Cmd pressed")
-  end
-  metaWas = meta
+  -- (3.1.0 briefly let go of the camera the moment Cmd went down. stopping
+  -- mouselook in the middle of a macOS app switch left the cursor hidden for
+  -- the whole desktop, so the only trigger is the frame rate again.)
 
   if elapsed >= frameLimit then
     fastFor = 0
@@ -642,7 +637,6 @@ local defaults = {
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
   focusDwell         = 0.5,        -- seconds of background-speed frames before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
-  cmdFrees     = true,             -- pressing Cmd (Win) frees the cursor right away: Cmd-Tab, Cmd-Space
   cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
@@ -779,6 +773,7 @@ function handlers:ADDON_LOADED(_, name)
   end
 
   copyDefaults(CTPIDB, defaults)
+  CTPIDB.cmdFrees = nil   -- 3.1.0 dev setting, removed
   ns.db = CTPIDB
 end
 
