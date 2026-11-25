@@ -28,6 +28,9 @@
   lands where you're looking, no placing. Your own centering settings come
   back when the camera lets go and on logout. Ground spells not on the list
   still free the cursor to place them by hand.
+- **Cursor reappears: On the reticle** (quick menu, `/ctpi cursor reticle`):
+  when the camera lets go, the cursor shows up on the reticle instead of
+  wherever it was when the camera locked.
 - **Flip camera 180** as a click choice (left, right, Shift-click,
   Shift-right-click), using the game's own Flip Camera.
 - **Tab lock / unlock** (Behavior tab, quick menu, `/ctpi tab`, off by

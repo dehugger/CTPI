@@ -345,6 +345,8 @@ local function refreshReticle()
   if ns.LayoutCombo then ns.LayoutCombo() end   -- ring inside the arc, or row above
   if ns.LayoutHUD then ns.LayoutHUD() end
   if ns.LayoutLook then ns.LayoutLook() end
+  -- "on the reticle" cursor follows the reticle's height
+  if ns.db.cursorReturn == "reticle" and ns.ApplyCursorReturn then ns.ApplyCursorReturn() end
 end
 ns.RefreshReticle = refreshReticle
 
@@ -484,11 +486,7 @@ function ns.SetAimCentering(on)
       db.savedAimCentering = ns.GetCVar("CursorFreelookCentering") or "0"
       db.savedAimYPos = ns.GetCVar("CursorCenteredYPos") or "0.5"
     end
-    local y = 0.5
-    local _, cy = CTPIReticle and CTPIReticle:GetCenter()
-    local h = UIParent:GetHeight()
-    if cy and h and h > 0 then y = math.max(0.01, math.min(0.99, cy / h)) end
-    pcall(ns.SetCVar, "CursorCenteredYPos", y)
+    pcall(ns.SetCVar, "CursorCenteredYPos", ns.ReticleYFraction())
     pcall(ns.SetCVar, "CursorFreelookCentering", 1)
     aimCenterOn = true
   elseif not on and (aimCenterOn or db.savedAimCentering ~= nil) then
@@ -529,8 +527,18 @@ ns.RecordFreeCursor = recordFreeCursor
 -- cursor when the camera lets go (db.cursorReturn):
 --   "game"   leave the game's setting alone
 --   "stay"   reappear where it was (CursorFreelookCentering 0)
---   "center" the game's centering (CursorFreelookCentering 1)
--- your own value is saved and put back on logout or when set to "game"
+--   "center"  the game's centering (CursorFreelookCentering 1)
+--   "reticle" centered, at the reticle's height (CursorCenteredYPos)
+-- the game centers the hidden cursor when the camera locks, so it comes
+-- back there when the camera lets go, wherever it was before.
+-- your own values are saved and put back on logout or when set to "game"
+function ns.ReticleYFraction()
+  local _, cy = CTPIReticle and CTPIReticle:GetCenter()
+  local h = UIParent:GetHeight()
+  if cy and h and h > 0 then return math.max(0.01, math.min(0.99, cy / h)) end
+  return 0.5
+end
+
 function ns.ApplyCursorReturn()
   local db = ns.db
   if not db then return end
@@ -540,12 +548,25 @@ function ns.ApplyCursorReturn()
       pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
       db.savedCursorCentering = nil
     end
+    if db.savedCursorYPos ~= nil then
+      pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
+      db.savedCursorYPos = nil
+    end
     return
   end
   if db.savedCursorCentering == nil then
     db.savedCursorCentering = ns.GetCVar("CursorFreelookCentering") or "0"
   end
-  pcall(ns.SetCVar, "CursorFreelookCentering", mode == "center" and 1 or 0)
+  if mode == "reticle" then
+    if db.savedCursorYPos == nil then
+      db.savedCursorYPos = ns.GetCVar("CursorCenteredYPos") or "0.5"
+    end
+    pcall(ns.SetCVar, "CursorCenteredYPos", ns.ReticleYFraction())
+  elseif db.savedCursorYPos ~= nil then
+    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
+    db.savedCursorYPos = nil
+  end
+  pcall(ns.SetCVar, "CursorFreelookCentering", (mode == "center" or mode == "reticle") and 1 or 0)
 end
 
 local function disengage()
@@ -677,7 +698,7 @@ local defaults = {
   focusFpsThreshold  = 0,          -- 0 = auto-derive from maxfpsbk; else absolute FPS
   focusDwell         = 0.5,        -- seconds of background-speed frames before we call it focus-lost
   manageBackgroundFps = true,      -- set the background fps cap to 8 so focus loss is detectable
-  cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center
+  cursorReturn = "game",           -- cursor when the camera lets go: game | stay | center | reticle
   lockKey            = "SHIFT-TAB", -- grab look-at mob as hard target ("" = unbound)
   focusKey           = "CTRL-TAB",  -- set focus to target/look-at ("" = unbound)
   clearFocusKey      = "",          -- clear focus ("" = unbound)
@@ -875,6 +896,10 @@ function handlers:PLAYER_LOGOUT()
   ns.RestoreBackgroundCap()
   local db = ns.db
   if ns.SetAimCentering then ns.SetAimCentering(false) end
+  if db and db.savedCursorYPos ~= nil then
+    pcall(ns.SetCVar, "CursorCenteredYPos", db.savedCursorYPos)
+    db.savedCursorYPos = nil
+  end
   if db and db.savedCursorCentering ~= nil then   -- put your own value back
     pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
     db.savedCursorCentering = nil
@@ -1041,8 +1066,8 @@ SlashCmdList["CTPI"] = function(msg)
 
   elseif cmd == "cursor" then
     local v = rest:lower()
-    if v ~= "game" and v ~= "stay" and v ~= "center" then
-      p("usage: /ctpi cursor <game|stay|center>  (now: " .. tostring(db.cursorReturn or "game") .. ")"); return
+    if v ~= "game" and v ~= "stay" and v ~= "center" and v ~= "reticle" then
+      p("usage: /ctpi cursor <game|stay|center|reticle>  (now: " .. tostring(db.cursorReturn or "game") .. ")"); return
     end
     db.cursorReturn = v
     ns.ApplyCursorReturn()

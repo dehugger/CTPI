@@ -60,7 +60,7 @@ local ROWS = {
     set = function() SlashCmdList["CTPI"]("toggle") end },
   { label = "Cursor reappears", path = "cursorReturn",
     after = function() if ns.ApplyCursorReturn then ns.ApplyCursorReturn() end end,
-    cycle = { { "game", "Game default" }, { "stay", "Where it was" }, { "center", "Centered" } } },
+    cycle = { { "game", "Game default" }, { "stay", "Where it was" }, { "center", "Centered" }, { "reticle", "On the reticle" } } },
   { label = "Free cursor (stay unlocked)",
     get = function() return ns.freeCursorHeld end,
     set = function() CTPI_ToggleFreeCursor() end },
