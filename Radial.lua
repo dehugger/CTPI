@@ -109,20 +109,46 @@ local PIE_POSTCLICK = [[
 ]]
 
 -- the shift-click opener: bound to SHIFT-BUTTON1 / SHIFT-BUTTON2 while the
--- camera is locked. opens on the press; the release is ignored, so it
--- can't land on the ring as a pick.
+-- camera is locked. the press opens the ring; the release works like a
+-- stick flick: moved past the dead zone -> cast that section and close,
+-- didn't move -> the ring stays open and a click picks. it acts on the
+-- release (useOnKeyDown off), so the cast happens on let-go.
 local openBtn = CreateFrame("Button", "CTPIRadialOpenButton", UIParent, "SecureActionButtonTemplate")
 openBtn:RegisterForClicks("AnyUp", "AnyDown")
+openBtn:SetAttribute("type", "macro")
+openBtn:SetAttribute("useOnKeyDown", false)
 local OPEN_PRECLICK = [[
-  if not down then return false end
-  if owner:GetAttribute("ctpi-block") then return false end
-  local sel = owner:GetAttribute("ctpi-sel")
-  local i = sel and SecureCmdOptionParse(sel)
-  if i and i ~= "" and i ~= "0" then
-    owner:SetAttribute("state-radial", "0")
-    owner:SetAttribute("state-radial", i)
+  if down then
+    if owner:GetAttribute("ctpi-block") then return false end
+    local sel = owner:GetAttribute("ctpi-sel")
+    local i = sel and SecureCmdOptionParse(sel)
+    if i and i ~= "" and i ~= "0" then
+      owner:SetAttribute("state-radial", "0")
+      owner:SetAttribute("state-radial", i)
+    end
+    return false
   end
-  return false
+  local st = owner:GetAttribute("state-radial")
+  if not st or st == "0" then return false end
+  local pie = owner:GetFrameRef("pie" .. st)
+  if not pie then return false end
+  local mx, my = pie:GetMousePosition()
+  if not mx then return false end
+  local dx, dy = mx - 0.5, my - 0.5
+  local dead = pie:GetAttribute("ctpi-dead") or 0
+  if dx * dx + dy * dy < dead * dead then return false end
+  local n = pie:GetAttribute("ctpi-n") or 0
+  local best, pick = -10, nil
+  for k = 1, n do
+    local d = dx * (pie:GetAttribute("ctpi-ux" .. k) or 0) + dy * (pie:GetAttribute("ctpi-uy" .. k) or 0)
+    if d > best then best, pick = d, k end
+  end
+  if not pick then return false end
+  self:SetAttribute("macrotext", pie:GetAttribute("ctpi-m" .. pick))
+  return nil, "close"
+]]
+local OPEN_POSTCLICK = [[
+  owner:SetAttribute("state-radial", "0")
 ]]
 local openWrapped = false
 
@@ -222,6 +248,7 @@ local function buildFrames()
     r:Hide()
     ringFrames[i] = r
     SecureHandlerSetFrameRef(header, "ring" .. i, r)
+    SecureHandlerSetFrameRef(header, "pie" .. i, pie)
   end
 end
 
@@ -472,7 +499,7 @@ function ns.RebuildRadial()
       end
     end
     if useSecure and not openWrapped then
-      openWrapped = pcall(SecureHandlerWrapScript, openBtn, "OnClick", header, OPEN_PRECLICK) and true or false
+      openWrapped = pcall(SecureHandlerWrapScript, openBtn, "OnClick", header, OPEN_PRECLICK, OPEN_POSTCLICK) and true or false
     end
   end
   -- click mode: a shift-click opens it (Secure.lua binds the key), no holding

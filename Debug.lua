@@ -325,7 +325,10 @@ local function hookClicks()
     local b = _G[name]
     if b then
       b:HookScript("OnClick", function(_, button, down)
-        if not down then return end
+        if not down then
+          if name == "CTPIRadialOpenButton" then ns.Log("radial", "opener released (flick pick if you moved)") end
+          return
+        end
         ns.Log("click", desc .. " fired, target " .. unitDesc("target"))
       end)
     end

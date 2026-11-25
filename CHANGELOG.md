@@ -34,9 +34,10 @@
   target in one press), Target look (targets what's under the reticle), or
   Radial.
 - **Shift-click to open the radial:** set either one to Radial and a
-  shift-click opens the ring instead of holding the modifier. It stays open
-  until a click picks a section; right-click or a click in the middle closes
-  it. The cursor is hidden while a ring is open, so the pointer from the
+  shift-click opens the ring instead of holding the modifier. Let go without
+  moving and it stays open until a click picks a section; right-click or a click in the middle closes
+  it. Or flick it: hold the shift-click, move toward a section, and let go
+  to cast it. The cursor is hidden while a ring is open, so the pointer from the
   ring's center works like a thumbstick ("Hide cursor" on the Class tab).
 - **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
   chat messages. The top half is a live readout (cursor locked or free and
