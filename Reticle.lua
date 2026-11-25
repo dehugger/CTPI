@@ -26,6 +26,19 @@ ns.RETICLE_DEFAULTS = {
   HUNTER  = "Scatter Shot, Wyvern Sting, Scare Beast",
 }
 
+-- ground spells (Distract, Blizzard...) cast at the crosshair: /cast [@cursor].
+-- while the camera is locked CTPI keeps the game's cursor centering on, so
+-- the hidden cursor sits on the crosshair and "@cursor" means "where I'm
+-- looking". (only once you've put ground macros on your bars.)
+ns.GROUND_DEFAULTS = {
+  ROGUE   = "Distract",
+  MAGE    = "Blizzard, Flamestrike",
+  WARLOCK = "Rain of Fire",
+  DRUID   = "Hurricane",
+  HUNTER  = "Volley, Flare",
+  PRIEST  = "Mass Dispel",
+}
+
 local PREFIX = "CT:"
 local ICON = 134400          -- question mark: #showtooltip swaps in the spell's own icon
 local MAX_SLOTS = 180
@@ -40,6 +53,13 @@ function ns.ReticleList()
   return cfg.reticle
 end
 
+function ns.GroundList()
+  local cfg = ns.ClassConfig and ns.ClassConfig()
+  if not cfg then return "" end
+  if cfg.ground == nil then cfg.ground = ns.GROUND_DEFAULTS[ns.PlayerClass()] or "" end
+  return cfg.ground
+end
+
 local function knownSpellName(name)
   local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(name)
   if type(info) == "table" and info.name and not ns.IsSecret(info.name) then return info.name end
@@ -52,18 +72,23 @@ end
 -- parsed list: { {spell=, macro=}, ... }, plus names that arent known
 local function entries()
   local out, unknown = {}, {}
-  for raw in (ns.ReticleList() .. ","):gmatch("([^,]*),") do
-    local s = raw:gsub("^%s+", ""):gsub("%s+$", "")
-    if s ~= "" then
-      local n = knownSpellName(s)
-      if n then out[#out + 1] = { spell = n, macro = (PREFIX .. n):sub(1, 16) }
-      else unknown[#unknown + 1] = s end
+  local function add(list, ground)
+    for raw in (list .. ","):gmatch("([^,]*),") do
+      local s = raw:gsub("^%s+", ""):gsub("%s+$", "")
+      if s ~= "" then
+        local n = knownSpellName(s)
+        if n then out[#out + 1] = { spell = n, macro = (PREFIX .. n):sub(1, 16), ground = ground }
+        else unknown[#unknown + 1] = s end
+      end
     end
   end
+  add(ns.ReticleList(), false)
+  add(ns.GroundList(), true)
   return out, unknown
 end
 
-local function body(spell)
+local function body(spell, ground)
+  if ground then return "#showtooltip " .. spell .. "\n/cast [@cursor] " .. spell end
   return "#showtooltip " .. spell .. "\n/cast [@mouseover,harm,nodead][] " .. spell
 end
 
@@ -74,12 +99,12 @@ local function makeMacros()
   for _, e in ipairs(list) do
     local idx = GetMacroIndexByName(e.macro)
     if idx and idx > 0 then
-      EditMacro(idx, e.macro, ICON, body(e.spell))
+      EditMacro(idx, e.macro, ICON, body(e.spell, e.ground))
       made[#made + 1] = e
     else
       local _, chars = GetNumMacros()
       local maxChar = MAX_CHARACTER_MACROS or 18
-      local ok = chars < maxChar and pcall(CreateMacro, e.macro, ICON, body(e.spell), true)
+      local ok = chars < maxChar and pcall(CreateMacro, e.macro, ICON, body(e.spell, e.ground), true)
       if ok then made[#made + 1] = e else failed[#failed + 1] = e.spell end
     end
   end
@@ -113,8 +138,14 @@ function ns.PlaceReticleMacros()
       swapped = swapped + 1
     end
   end
-  local names = {}
-  for _, e in ipairs(made) do names[#names + 1] = e.spell end
+  local names, anyGround = {}, false
+  for _, e in ipairs(made) do
+    names[#names + 1] = e.spell .. (e.ground and " (at crosshair)" or "")
+    if e.ground then anyGround = true end
+  end
+  -- ground macros only aim right with the cursor held on the crosshair
+  ns.db.groundAim = anyGround or nil
+  ns.ForceReconcile()
   p("reticle casts: " .. (#names > 0 and table.concat(names, ", ") or "none") .. " ready, "
     .. swapped .. " bar slot(s) swapped."
     .. (#unknown > 0 and (" Not in your spellbook: " .. table.concat(unknown, ", ") .. ".") or "")
@@ -146,5 +177,7 @@ function ns.RestoreReticleSpells()
       end
     end
   end
+  ns.db.groundAim = nil
+  if ns.SetAimCentering then ns.SetAimCentering(false) end
   p("reticle casts: put " .. back .. " plain spell(s) back on your bars.")
 end

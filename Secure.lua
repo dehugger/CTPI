@@ -54,7 +54,8 @@ local function makeBinder(ownerFrame)
 end
 local setClick = makeBinder(owner)
 
-local CLICK_ACTIONS = { INTERACTMOUSEOVER = true, MOVEFORWARD = true, TOGGLEAUTORUN = true }
+local CLICK_ACTIONS = { INTERACTMOUSEOVER = true, MOVEFORWARD = true, TOGGLEAUTORUN = true,
+                        FLIPCAMERAYAW = true }
 
 -- Shift-click / Shift-right-click (db.shiftLeft / db.shiftRight). "" leaves
 -- them alone: the game falls back to the plain click with Shift held, which
@@ -64,6 +65,7 @@ local SHIFT_TARGETS = {
   INTERACTMOUSEOVER = { "A", "INTERACTMOUSEOVER" },
   MOVEFORWARD       = { "A", "MOVEFORWARD" },
   TOGGLEAUTORUN     = { "A", "TOGGLEAUTORUN" },
+  FLIPCAMERAYAW     = { "A", "FLIPCAMERAYAW" },             -- the game's Flip Camera
   UNLOCK            = { "C", "CTPITabUnlockButton" },   -- one-press /cleartarget ("Clear target")
   FREECURSOR        = { "A", "CTPI_FREECURSOR" },       -- same as the free-cursor key
   TARGET            = { "C", "CTPITabLockButton" },     -- target what you look at

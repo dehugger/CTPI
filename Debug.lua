@@ -67,6 +67,7 @@ local function bindingName(key)
     return CLICK_NAMES[btn] or btn
   end
   if a == "CTPI_FREECURSOR" then return "free cursor (toggle)" end
+  if a == "FLIPCAMERAYAW" then return "flip camera 180" end
   return a:lower()
 end
 
@@ -105,6 +106,17 @@ local function stateText()
   add("combat", yn(InCombatLockdown()) .. "   stealth " .. yn((ns.PlayerStealthed())) .. "   form "
     .. tostring(plain(GetShapeshiftForm and GetShapeshiftForm())))
 
+  do
+    local x, y = GetCursorPosition()
+    local sc = UIParent:GetEffectiveScale()
+    local w, h = UIParent:GetWidth() * sc, UIParent:GetHeight() * sc
+    if x and w > 0 and h > 0 then
+      add("cursor", string.format("%d%% across, %d%% up   ground aim %s (centering %s, y %s)",
+        math.floor(x / w * 100 + 0.5), math.floor(y / h * 100 + 0.5),
+        yn(ns.db.groundAim, "on", "off"), tostring(ns.GetCVar("CursorFreelookCentering")),
+        tostring(ns.GetCVar("CursorCenteredYPos"))))
+    end
+  end
   add("target", unitDesc("target"))
   local cp = ns.GetComboPoints and ns.GetComboPoints()
   if cp ~= nil then add("combo pts", tostring(plain(cp))) end

@@ -471,8 +471,40 @@ ns.UpdateCombo = updateCombo
 -- ---------------------------------------------------------------------
 -- The reconciliation loop
 -- ---------------------------------------------------------------------
+-- ground spells at the crosshair (Reticle.lua): while the camera is locked,
+-- the game's cursor centering holds the hidden cursor on the crosshair, so
+-- /cast [@cursor] lands where you're looking. your own centering values
+-- are saved and put back when the camera lets go (and on logout).
+local aimCenterOn = false
+function ns.SetAimCentering(on)
+  local db = ns.db
+  if not db then return end
+  if on and not aimCenterOn then
+    if db.savedAimCentering == nil then
+      db.savedAimCentering = ns.GetCVar("CursorFreelookCentering") or "0"
+      db.savedAimYPos = ns.GetCVar("CursorCenteredYPos") or "0.5"
+    end
+    local y = 0.5
+    local _, cy = CTPIReticle and CTPIReticle:GetCenter()
+    local h = UIParent:GetHeight()
+    if cy and h and h > 0 then y = math.max(0.01, math.min(0.99, cy / h)) end
+    pcall(ns.SetCVar, "CursorCenteredYPos", y)
+    pcall(ns.SetCVar, "CursorFreelookCentering", 1)
+    aimCenterOn = true
+  elseif not on and (aimCenterOn or db.savedAimCentering ~= nil) then
+    aimCenterOn = false
+    if db.savedAimCentering ~= nil then
+      pcall(ns.SetCVar, "CursorFreelookCentering", db.savedAimCentering)
+      pcall(ns.SetCVar, "CursorCenteredYPos", db.savedAimYPos or "0.5")
+      db.savedAimCentering, db.savedAimYPos = nil, nil
+    end
+    ns.ApplyCursorReturn()
+  end
+end
+
 local warnedML = false
 local function engage()
+  if ns.db.groundAim and ns.db.enabled then ns.SetAimCentering(true) end
   if not IsMouselooking() then MouselookStart() end
   if ns.debug and not warnedML and not IsMouselooking() then
     warnedML = true
@@ -517,7 +549,13 @@ function ns.ApplyCursorReturn()
 end
 
 local function disengage()
-  if IsMouselooking() then MouselookStop(); C_Timer.After(0, recordFreeCursor) end
+  if IsMouselooking() then
+    MouselookStop()
+    C_Timer.After(0, function()
+      recordFreeCursor()
+      if not IsMouselooking() then ns.SetAimCentering(false) end
+    end)
+  end
   updateReticle(false)
   if ns.UpdateLook then ns.UpdateLook(false) end
   ns.RemoveClickBindings()  -- Secure.lua (no-op in combat)
@@ -836,6 +874,7 @@ function handlers:ADDON_ACTION_FORBIDDEN(e, who, fn) reportBlocked(e, who, fn) e
 function handlers:PLAYER_LOGOUT()
   ns.RestoreBackgroundCap()
   local db = ns.db
+  if ns.SetAimCentering then ns.SetAimCentering(false) end
   if db and db.savedCursorCentering ~= nil then   -- put your own value back
     pcall(ns.SetCVar, "CursorFreelookCentering", db.savedCursorCentering)
     db.savedCursorCentering = nil

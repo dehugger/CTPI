@@ -77,7 +77,7 @@ local ROWS = {
       if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
     end,
     cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
-              { "TOGGLEAUTORUN", "Autorun" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "FLIPCAMERAYAW", "Flip 180" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
               { "TARGET", "Target look" },
               { "RADIAL", "Radial" } } },
   { label = "Shift-right-click", path = "shiftRight", combat = true,
@@ -86,7 +86,7 @@ local ROWS = {
       if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
     end,
     cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
-              { "TOGGLEAUTORUN", "Autorun" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "FLIPCAMERAYAW", "Flip 180" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
               { "TARGET", "Target look" },
               { "RADIAL", "Radial" } } },
   { label = "Combo lock", path = "comboLock", after = rebind, combat = true,
