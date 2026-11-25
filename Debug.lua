@@ -51,15 +51,16 @@ local CLICK_NAMES = {
   CTPIEnemyLockedButton = "LOCKED (act on target)",
   CTPIFriendClickButton = "friend click (heal)",
   CTPIUnlockButton      = "unlock (clear target)",
-  CTPITabLockButton     = "tab: target what you look at",
-  CTPITabUnlockButton   = "tab: unlock (clear target)",
+  CTPITabLockButton     = "target what you look at",
+  CTPITabUnlockButton   = "unlock (clear target)",
+  CTPIRadialOpenButton  = "open radial",
 }
 local function bindingName(key)
   local a = GetBindingAction and GetBindingAction(key, true)
   if not a or a == "" then return "nothing" end
   local btn = a:match("^CLICK ([^:]+)")
   if btn then
-    if btn:match("^CTPIRadial") then return "radial" end
+    if btn:match("^CTPIRadial%d") then return "radial" end
     return CLICK_NAMES[btn] or btn
   end
   return a:lower()
@@ -108,6 +109,7 @@ local function stateText()
 
   add("left-click", bindingName("BUTTON1"))
   add("right-click", bindingName("BUTTON2"))
+  add("shift-clicks", bindingName("SHIFT-BUTTON1") .. "  /  " .. bindingName("SHIFT-BUTTON2"))
   local tk = ns.TabKeys and ns.TabKeys()
   if tk then add(tk, bindingName(tk)) end
   local aim = CTPIAimHeader and CTPIAimHeader:GetAttribute("state-aim")

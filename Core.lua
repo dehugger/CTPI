@@ -629,6 +629,8 @@ local defaults = {
   comboLock    = "auto",           -- nothing under the reticle steals your target in combat: auto (rogue, cat form) | on | off
   unlockClicks = 2,                -- right-clicks in a row to unlock a locked target (1 or 2)
   tabLock      = false,            -- Tab: unlock while locked, else target what's under the reticle
+  shiftLeft    = "",               -- Shift-click: "" (plain click + shift) | an action | UNLOCK | TARGET | RADIAL
+  shiftRight   = "",               -- Shift-right-click: same choices
   rightAction  = "TOGGLEAUTORUN",
   softTargetEnemy    = true,       -- look-to-target a mob (softenemy)
   softTargetFriend   = false,      -- look-to-heal an ally (softfriend), opt-in
@@ -673,6 +675,7 @@ local defaults = {
   radial = {
     enabled = true,   -- hold the modifier for a ring of spells (Radial.lua)
     mod     = "shift", -- "shift" | "ctrl" | "alt"
+    hideCursor = true, -- hide the cursor while a ring is open (the pointer is the cursor)
     radius  = 170,
     size    = 44,
   },

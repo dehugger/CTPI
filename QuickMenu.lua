@@ -71,6 +71,22 @@ local ROWS = {
   { label = "Hard lock in combat", path = "hardLock", after = rebind, combat = true },
   { label = "Tab unlocks / targets", path = "tabLock", combat = true,
     after = function() if ns.ResetTabKeys and ns.db.tabLock then ns.ResetTabKeys() end; rebind() end },
+  { label = "Shift-click", path = "shiftLeft", combat = true,
+    after = function()
+      if ns.db.shiftLeft == "RADIAL" and ns.db.shiftRight == "RADIAL" then ns.db.shiftRight = "" end
+      if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
+    end,
+    cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+              { "RADIAL", "Radial" } } },
+  { label = "Shift-right-click", path = "shiftRight", combat = true,
+    after = function()
+      if ns.db.shiftLeft == "RADIAL" and ns.db.shiftRight == "RADIAL" then ns.db.shiftLeft = "" end
+      if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
+    end,
+    cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+              { "RADIAL", "Radial" } } },
   { label = "Combo lock", path = "comboLock", after = rebind, combat = true,
     cycle = { { "auto", "Auto" }, { "on", "On" }, { "off", "Off" } } },
   { label = "Rogue stealth openers", path = "rogueOpeners", after = rebind },

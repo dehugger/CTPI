@@ -540,7 +540,7 @@ local function buildClassPage(page)
   retNote:SetText("comma list; swaps CT: macros in for these spells")
 
   -- ---- radial ----
-  local hRad = sectionHeader(page, "Radial menu (hold the modifier)", retPut, -12)
+  local hRad = sectionHeader(page, "Radial menu (hold the modifier, or Shift-click: Radial)", retPut, -12)
   local cRad = makeCheck(page, "Enabled",
     function() return db.radial.enabled end,
     function(v)
@@ -557,6 +557,11 @@ local function buildClassPage(page)
     function(v) db.radial.mod = v; rebuildClass() end)
   modBtns[1]:SetPoint("LEFT", cRad, "RIGHT", 70, 0)
   repaints[#repaints+1] = modRepaint
+  local cHideCur = makeCheck(page, "Hide cursor",
+    function() return db.radial.hideCursor ~= false end,
+    function(v) db.radial.hideCursor = v end)
+  cHideCur:SetPoint("LEFT", modBtns[#modBtns], "RIGHT", 10, 0)
+  controls[#controls+1] = cHideCur
   local rRad = makeSliderRow(page, "Ring size", 90, 320, 1, nil,
     function() return db.radial.radius end, function(v) db.radial.radius = v; rebuildClass() end)
   rRad:SetPoint("TOPLEFT", cRad, "BOTTOMLEFT", 4, -4)
@@ -801,10 +806,62 @@ local function buildBehaviorPage(page)
   rightBtns[1]:SetPoint("TOPLEFT", rightLbl, "BOTTOMLEFT", 0, -6)
   repaints[#repaints+1] = rightRepaint
 
+  -- Shift-click / Shift-right-click: cycle buttons (left-click: next,
+  -- right-click: back). only one of them can open the radial.
+  local SHIFT_CHOICES = {
+    { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
+    { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+    { "RADIAL", "Radial" },
+  }
+  local shiftRefresh = {}
+  local function shiftCycle(path, label)
+    local b = makeButton(page, "", 188, nil)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    local function refresh()
+      local cur, name = db[path] or "", "?"
+      for _, c in ipairs(SHIFT_CHOICES) do if c[1] == cur then name = c[2] end end
+      b:SetText(label .. ": " .. name)
+    end
+    b:SetScript("OnClick", function(_, btn)
+      if InCombatLockdown() then return end
+      local cur, idx = db[path] or "", 1
+      for i, c in ipairs(SHIFT_CHOICES) do if c[1] == cur then idx = i end end
+      idx = idx + (btn == "RightButton" and -1 or 1)
+      if idx > #SHIFT_CHOICES then idx = 1 elseif idx < 1 then idx = #SHIFT_CHOICES end
+      local v = SHIFT_CHOICES[idx][1]
+      if v == "RADIAL" then
+        local other = (path == "shiftLeft") and "shiftRight" or "shiftLeft"
+        if db[other] == "RADIAL" then db[other] = "" end
+      end
+      db[path] = v
+      if ns.RebuildRadial then ns.RebuildRadial() end
+      ns.RefreshBindings()
+      for _, f in ipairs(shiftRefresh) do f() end
+    end)
+    b:SetScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+      GameTooltip:AddLine(label)
+      GameTooltip:AddLine("Click: next choice. Right-click: back.", 1, 1, 1, true)
+      GameTooltip:AddLine("Default: your normal click with Shift held (rogue Sap / Garrote use it). "
+        .. "Unlock clears your target in one press. Target look targets what's under the reticle. "
+        .. "Radial opens the ring on a click instead of holding the modifier.", 0.8, 0.8, 0.8, true)
+      GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    shiftRefresh[#shiftRefresh + 1] = refresh
+    repaints[#repaints + 1] = refresh
+    refresh()
+    return b
+  end
+  local shiftL = shiftCycle("shiftLeft", "Shift-click")
+  shiftL:SetPoint("TOPLEFT", rightBtns[1], "BOTTOMLEFT", 0, -8)
+  local shiftR = shiftCycle("shiftRight", "Shift-right")
+  shiftR:SetPoint("LEFT", shiftL, "RIGHT", 6, 0)
+
   local cStopAuto = makeCheck(page, "Left-click stops autorun (when left is Interact, out of combat)",
     function() return db.leftStopsAutorun end,
     function(v) db.leftStopsAutorun = v; if ns.SyncAutorunSwap then ns.SyncAutorunSwap() end end)
-  cStopAuto:SetPoint("TOPLEFT", rightBtns[1], "BOTTOMLEFT", -4, -6)
+  cStopAuto:SetPoint("TOPLEFT", shiftL, "BOTTOMLEFT", -4, -6)
   controls[#controls+1] = cStopAuto
 
   local hSoft = sectionHeader(page, "Look to target", cStopAuto, -12)

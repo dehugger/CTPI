@@ -56,6 +56,28 @@ local setClick = makeBinder(owner)
 
 local CLICK_ACTIONS = { INTERACTMOUSEOVER = true, MOVEFORWARD = true, TOGGLEAUTORUN = true }
 
+-- Shift-click / Shift-right-click (db.shiftLeft / db.shiftRight). "" leaves
+-- them alone: the game falls back to the plain click with Shift held, which
+-- is what [mod:shift] macros (rogue Sap / Garrote) rely on.
+local SHIFT_KEYS = { shiftLeft = "SHIFT-BUTTON1", shiftRight = "SHIFT-BUTTON2" }
+local SHIFT_TARGETS = {
+  INTERACTMOUSEOVER = { "A", "INTERACTMOUSEOVER" },
+  MOVEFORWARD       = { "A", "MOVEFORWARD" },
+  TOGGLEAUTORUN     = { "A", "TOGGLEAUTORUN" },
+  UNLOCK            = { "C", "CTPITabUnlockButton" },   -- one-press /cleartarget
+  TARGET            = { "C", "CTPITabLockButton" },     -- target what you look at
+  RADIAL            = { "C", "CTPIRadialOpenButton" },  -- Radial.lua
+}
+
+-- the key that opens the radial by clicking, if one is set to "Radial"
+function ns.RadialClickKey()
+  local db = ns.db
+  if not (db and db.radial and db.radial.enabled) then return nil end
+  if db.shiftLeft == "RADIAL" then return "SHIFT-BUTTON1" end
+  if db.shiftRight == "RADIAL" then return "SHIFT-BUTTON2" end
+  return nil
+end
+
 -- "NATIVE" left-click leans on the game's interactOnLeftClick. turn it on
 -- while that mode is picked, and put your old value back when it isnt.
 -- out of combat only (called from the binding functions, which guard it).
@@ -600,6 +622,12 @@ function ns.ApplyClickBindings()
   else
     setClick("BUTTON2", nil)
   end
+  for path, key in pairs(SHIFT_KEYS) do
+    local v = db[path]
+    local t = SHIFT_TARGETS[v]
+    if v == "RADIAL" and ns.RadialClickKey() ~= key then t = nil end   -- radial off, or the other one has it
+    if t then setClick(key, t[1], t[2]) else setClick(key, nil) end
+  end
 end
 
 -- polled from the reconcile loop (Core.lua) and on mouseover / soft-target
@@ -632,6 +660,7 @@ function ns.RemoveClickBindings()
   if InCombatLockdown() then return end
   setClick("BUTTON1", nil)
   setClick("BUTTON2", nil)
+  for _, key in pairs(SHIFT_KEYS) do setClick(key, nil) end
   if driverOn then headerSync(true, false) end
 end
 

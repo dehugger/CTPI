@@ -126,7 +126,7 @@ local function clickHint(token)
     end
     local main = (style == "text" and "click: " or atlas("NPE_LeftClick", s)) .. one(spellHint.main)
     parts[#parts + 1] = main
-    if spellHint.shift then
+    if spellHint.shift and (ns.db.shiftLeft or "") == "" then
       parts[#parts + 1] = (style == "text" and "shift: " or "|cFFc8a25eShift|r ") .. one(spellHint.shift)
     end
   elseif enemyMode then

@@ -3,7 +3,10 @@ local addonName, ns = ...
 -- =====================================================================
 -- CTPI / Radial.lua
 -- Hold a modifier (Shift by default) while the camera is locked and a
--- sectioned ring opens around the reticle. It works like a console radial:
+-- sectioned ring opens around the reticle. Or, with Shift-click (or
+-- Shift-right-click) set to "Radial", a shift-click opens it and it stays
+-- open until a click picks a section (right-click or a click in the middle
+-- closes it). It works like a console radial:
 -- the direction you move picks the section (it lights up, and a pointer
 -- shows your direction), and a click casts it. Not moving picks nothing.
 -- Let go of the modifier and the ring closes and the camera locks again.
@@ -74,12 +77,23 @@ local headerDriver = false
 local blockFlag = nil
 
 -- the pie click: pick the section from the cursor direction
+-- in click mode (owner's ctpi-click) the ring also closes itself: on the
+-- release of a pick (after the cast, via the post-click), or on a click in
+-- the middle / a right-click
 local PIE_PRECLICK = [[
+  local click = owner:GetAttribute("ctpi-click")
+  if click and button == "RightButton" then
+    if not down then owner:SetAttribute("state-radial", "0") end
+    return false
+  end
   local mx, my = self:GetMousePosition()
   if not mx then return false end
   local dx, dy = mx - 0.5, my - 0.5
   local dead = self:GetAttribute("ctpi-dead") or 0
-  if dx * dx + dy * dy < dead * dead then return false end
+  if dx * dx + dy * dy < dead * dead then
+    if click and not down then owner:SetAttribute("state-radial", "0") end
+    return false
+  end
   local n = self:GetAttribute("ctpi-n") or 0
   local best, pick = -10, nil
   for k = 1, n do
@@ -88,7 +102,29 @@ local PIE_PRECLICK = [[
   end
   if not pick then return false end
   self:SetAttribute("macrotext", self:GetAttribute("ctpi-m" .. pick))
+  if click then return nil, "close" end
 ]]
+local PIE_POSTCLICK = [[
+  if not down then owner:SetAttribute("state-radial", "0") end
+]]
+
+-- the shift-click opener: bound to SHIFT-BUTTON1 / SHIFT-BUTTON2 while the
+-- camera is locked. opens on the press; the release is ignored, so it
+-- can't land on the ring as a pick.
+local openBtn = CreateFrame("Button", "CTPIRadialOpenButton", UIParent, "SecureActionButtonTemplate")
+openBtn:RegisterForClicks("AnyUp", "AnyDown")
+local OPEN_PRECLICK = [[
+  if not down then return false end
+  if owner:GetAttribute("ctpi-block") then return false end
+  local sel = owner:GetAttribute("ctpi-sel")
+  local i = sel and SecureCmdOptionParse(sel)
+  if i and i ~= "" and i ~= "0" then
+    owner:SetAttribute("state-radial", "0")
+    owner:SetAttribute("state-radial", i)
+  end
+  return false
+]]
+local openWrapped = false
 
 -- ---------------------------------------------------------------------
 -- frames (created at load, out of combat)
@@ -323,14 +359,30 @@ local function layoutRing(r, outer, entries, ringName, useSecure)
   paint(r, nil)
 end
 
--- hover highlight while a ring is open
+-- hover highlight while a ring is open. the cursor itself is hidden
+-- (db.radial.hideCursor): the pointer from the ring's center is the cursor,
+-- like a thumbstick. the game can't move the real cursor, so this is how
+-- it reads as "centered".
+local BLANK_CURSOR = "Interface\\AddOns\\" .. addonName .. "\\Media\\blank"
+local cursorHidden = false
 local hoverDriver = CreateFrame("Frame")
 hoverDriver:SetScript("OnUpdate", function()
+  local any = false
   for _, r in ipairs(ringFrames) do
     if r:IsShown() then
+      any = true
       local h = hoverSection(r)
       if h ~= r.hover then r.hover = h; paint(r, h) end
     end
+  end
+  local db = ns.db
+  local hide = any and db and db.radial and db.radial.hideCursor ~= false
+  if hide then
+    SetCursor(BLANK_CURSOR)        -- every frame: the UI resets it on enter / leave
+    cursorHidden = true
+  elseif cursorHidden then
+    ResetCursor()
+    cursorHidden = false
   end
 end)
 
@@ -390,6 +442,13 @@ local function clause(mod, groups, result)
   return table.concat(parts) .. " " .. result .. "; "
 end
 
+-- the same, without the modifier (click mode picks the ring at click time)
+local function plainClause(groups, result)
+  local parts = {}
+  for _, g in ipairs(groups) do parts[#parts + 1] = "[" .. g .. "]" end
+  return table.concat(parts) .. " " .. result .. "; "
+end
+
 local wrapped = {}
 
 function ns.RebuildRadial()
@@ -408,11 +467,19 @@ function ns.RebuildRadial()
   if useSecure then
     for _, r in ipairs(ringFrames) do
       if not wrapped[r] then
-        local ok = pcall(SecureHandlerWrapScript, r.pie, "OnClick", header, PIE_PRECLICK)
+        local ok = pcall(SecureHandlerWrapScript, r.pie, "OnClick", header, PIE_PRECLICK, PIE_POSTCLICK)
         if ok then wrapped[r] = true else useSecure = false end
       end
     end
+    if useSecure and not openWrapped then
+      openWrapped = pcall(SecureHandlerWrapScript, openBtn, "OnClick", header, OPEN_PRECLICK) and true or false
+    end
   end
+  -- click mode: a shift-click opens it (Secure.lua binds the key), no holding
+  local clickMode = ns.RadialClickKey and ns.RadialClickKey() ~= nil
+  if clickMode and not (useSecure and openWrapped) then return end   -- needs snippets
+  header:SetAttribute("ctpi-click", clickMode or nil)
+  header:SetAttribute("state-radial", "0")
 
   local mod = MOD_COND[db.radial.mod or "shift"] or "mod:shift"
   local outer = db.radial.radius or 170
@@ -426,7 +493,7 @@ function ns.RebuildRadial()
     if (rg.cond or "") == "" then order[#order + 1] = rg end
   end
 
-  local prior, headerCond = "", ""
+  local prior, headerCond, selCond = "", "", ""
   for i, rg in ipairs(order) do
     if i > MAX_RINGS then break end
     local r = ringFrames[i]
@@ -447,15 +514,20 @@ function ns.RebuildRadial()
     if #entries > 0 then
       if useSecure then
         headerCond = headerCond .. clause(mod, groups, tostring(i))
-      else
+        selCond = selCond .. plainClause(groups, tostring(i))
+      elseif not clickMode then
         RegisterStateDriver(r, "visibility", prior .. clause(mod, groups, "show") .. "hide")
       end
     elseif useSecure then
       headerCond = headerCond .. clause(mod, groups, "0")   -- empty ring still blocks later ones
+      selCond = selCond .. plainClause(groups, "0")
     end
     prior = prior .. clause(mod, groups, "hide")
   end
-  if useSecure and headerCond ~= "" then
+  if useSecure and clickMode then
+    header:SetAttribute("ctpi-sel", selCond .. "0")
+    headerDriver = true          -- secure path in use (no driver: the click opens it)
+  elseif useSecure and headerCond ~= "" then
     RegisterStateDriver(header, "radial", headerCond .. "0")
     headerDriver = true
   end

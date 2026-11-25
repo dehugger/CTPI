@@ -28,6 +28,16 @@
 - **Switching apps:** coming back no longer re-grabs the mouse on frame rate
   alone (it could grab it while another app was still in front). The camera
   re-locks once you click or press a movement key in the game window.
+- **Shift-click and Shift-right-click actions** (Behavior tab, quick menu):
+  each can be Default (your normal click with Shift held, which rogue
+  Sap / Garrote rely on), Interact, Hold run, Autorun, Unlock (clears your
+  target in one press), Target look (targets what's under the reticle), or
+  Radial.
+- **Shift-click to open the radial:** set either one to Radial and a
+  shift-click opens the ring instead of holding the modifier. It stays open
+  until a click picks a section; right-click or a click in the middle closes
+  it. The cursor is hidden while a ring is open, so the pointer from the
+  ring's center works like a thumbstick ("Hide cursor" on the Class tab).
 - **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
   chat messages. The top half is a live readout (cursor locked or free and
   why, focus and fps, combat, target, combo points, what's under the
