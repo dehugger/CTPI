@@ -810,7 +810,8 @@ local function buildBehaviorPage(page)
   -- right-click: back). only one of them can open the radial.
   local SHIFT_CHOICES = {
     { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
-    { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+    { "TOGGLEAUTORUN", "Autorun" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
+    { "TARGET", "Target look" },
     { "RADIAL", "Radial" },
   }
   local shiftRefresh = {}
@@ -843,7 +844,8 @@ local function buildBehaviorPage(page)
       GameTooltip:AddLine(label)
       GameTooltip:AddLine("Click: next choice. Right-click: back.", 1, 1, 1, true)
       GameTooltip:AddLine("Default: your normal click with Shift held (rogue Sap / Garrote use it). "
-        .. "Unlock clears your target in one press. Target look targets what's under the reticle. "
+        .. "Free cursor frees the mouse (a Shift-click in the world locks it again). "
+        .. "Clear target drops your target in one press. Target look targets what's under the reticle. "
         .. "Radial opens the ring on a click instead of holding the modifier.", 0.8, 0.8, 0.8, true)
       GameTooltip:Show()
     end)

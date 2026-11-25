@@ -30,9 +30,10 @@
   re-locks once you click or press a movement key in the game window.
 - **Shift-click and Shift-right-click actions** (Behavior tab, quick menu):
   each can be Default (your normal click with Shift held, which rogue
-  Sap / Garrote rely on), Interact, Hold run, Autorun, Unlock (clears your
-  target in one press), Target look (targets what's under the reticle), or
-  Radial.
+  Sap / Garrote rely on), Interact, Hold run, Autorun, Free cursor (same as
+  the free-cursor key; a Shift-click in the world locks the camera again),
+  Clear target (one press), Target look (targets what's under the
+  reticle), or Radial.
 - **Shift-click to open the radial:** set either one to Radial and a
   shift-click opens the ring instead of holding the modifier. Let go without
   moving and it stays open until a click picks a section; right-click or a click in the middle closes

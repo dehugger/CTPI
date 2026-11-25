@@ -77,7 +77,8 @@ local ROWS = {
       if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
     end,
     cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
-              { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
+              { "TARGET", "Target look" },
               { "RADIAL", "Radial" } } },
   { label = "Shift-right-click", path = "shiftRight", combat = true,
     after = function()
@@ -85,7 +86,8 @@ local ROWS = {
       if ns.RebuildRadial then ns.RebuildRadial() end; rebind()
     end,
     cycle = { { "", "Default" }, { "INTERACTMOUSEOVER", "Interact" }, { "MOVEFORWARD", "Hold run" },
-              { "TOGGLEAUTORUN", "Autorun" }, { "UNLOCK", "Unlock" }, { "TARGET", "Target look" },
+              { "TOGGLEAUTORUN", "Autorun" }, { "FREECURSOR", "Free cursor" }, { "UNLOCK", "Clear target" },
+              { "TARGET", "Target look" },
               { "RADIAL", "Radial" } } },
   { label = "Combo lock", path = "comboLock", after = rebind, combat = true,
     cycle = { { "auto", "Auto" }, { "on", "On" }, { "off", "Off" } } },

@@ -64,7 +64,8 @@ local SHIFT_TARGETS = {
   INTERACTMOUSEOVER = { "A", "INTERACTMOUSEOVER" },
   MOVEFORWARD       = { "A", "MOVEFORWARD" },
   TOGGLEAUTORUN     = { "A", "TOGGLEAUTORUN" },
-  UNLOCK            = { "C", "CTPITabUnlockButton" },   -- one-press /cleartarget
+  UNLOCK            = { "C", "CTPITabUnlockButton" },   -- one-press /cleartarget ("Clear target")
+  FREECURSOR        = { "A", "CTPI_FREECURSOR" },       -- same as the free-cursor key
   TARGET            = { "C", "CTPITabLockButton" },     -- target what you look at
   RADIAL            = { "C", "CTPIRadialOpenButton" },  -- Radial.lua
 }
@@ -658,9 +659,14 @@ end
 
 function ns.RemoveClickBindings()
   if InCombatLockdown() then return end
+  local db = ns.db
   setClick("BUTTON1", nil)
   setClick("BUTTON2", nil)
-  for _, key in pairs(SHIFT_KEYS) do setClick(key, nil) end
+  -- a Shift-click set to Free cursor stays bound while the cursor is free,
+  -- so a Shift-click in the world locks the camera again
+  for path, key in pairs(SHIFT_KEYS) do
+    if not (db and db.enabled and db[path] == "FREECURSOR") then setClick(key, nil) end
+  end
   if driverOn then headerSync(true, false) end
 end
 

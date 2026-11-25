@@ -777,6 +777,12 @@ function handlers:ADDON_LOADED(_, name)
 
   copyDefaults(CTPIDB, defaults)
   CTPIDB.cmdFrees = nil   -- 3.1.0 dev setting, removed
+  -- dev builds labeled clear-target "Unlock"; it was meant to free the cursor
+  if not CTPIDB.shiftUnlockV2 then
+    CTPIDB.shiftUnlockV2 = true
+    if CTPIDB.shiftLeft == "UNLOCK" then CTPIDB.shiftLeft = "FREECURSOR" end
+    if CTPIDB.shiftRight == "UNLOCK" then CTPIDB.shiftRight = "FREECURSOR" end
+  end
   ns.db = CTPIDB
 end
 

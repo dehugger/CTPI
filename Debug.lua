@@ -26,9 +26,12 @@ local function plain(v)
   return v
 end
 
+local wall0, gt0
 local function stamp()
   local t = GetTime()
-  return string.format("%s.%02d", date("%H:%M:%S"), math.floor((t % 1) * 100))
+  if not wall0 then wall0, gt0 = time(), t end
+  local e = t - gt0
+  return string.format("%s.%02d", date("%H:%M:%S", wall0 + math.floor(e)), math.floor((e % 1) * 100))
 end
 
 -- the one entry point: ns.Log("cursor", "free: radial menu open")
@@ -52,7 +55,7 @@ local CLICK_NAMES = {
   CTPIFriendClickButton = "friend click (heal)",
   CTPIUnlockButton      = "unlock (clear target)",
   CTPITabLockButton     = "target what you look at",
-  CTPITabUnlockButton   = "unlock (clear target)",
+  CTPITabUnlockButton   = "clear target",
   CTPIRadialOpenButton  = "open radial",
 }
 local function bindingName(key)
@@ -63,6 +66,7 @@ local function bindingName(key)
     if btn:match("^CTPIRadial%d") then return "radial" end
     return CLICK_NAMES[btn] or btn
   end
+  if a == "CTPI_FREECURSOR" then return "free cursor (toggle)" end
   return a:lower()
 end
 
