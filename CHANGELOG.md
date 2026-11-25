@@ -39,6 +39,9 @@
   it. Or flick it: hold the shift-click, move toward a section, and let go
   to cast it. The cursor is hidden while a ring is open, so the pointer from the
   ring's center works like a thumbstick ("Hide cursor" on the Class tab).
+  With any Shift-click action set, holding Shift no longer opens the ring (it
+  would swallow the Shift-click); use Shift-click: Radial, or Ctrl / Alt as
+  the hold key.
 - **Debug window** (`/ctpi debug`, quick menu, Behavior tab): replaces the
   chat messages. The top half is a live readout (cursor locked or free and
   why, focus and fps, combat, target, combo points, what's under the

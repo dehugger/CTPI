@@ -123,8 +123,11 @@ local function stateText()
   end
   add("hard lock", yn(db.hardLock, "on", "off") .. "   locked now " .. yn(ns.HardLocked and ns.HardLocked())
     .. "   left on enemies: " .. tostring(db.leftEnemy))
+  local how = (ns.RadialClickKey and ns.RadialClickKey()) and ("on " .. ns.RadialClickKey():lower())
+    or ((ns.RadialHoldBlocked and ns.RadialHoldBlocked()) and "|cFFff8800off: Shift-click has an action|r")
+    or ("hold " .. tostring(ns.db.radial and ns.db.radial.mod))
   add("other", "autorun swap " .. yn(ns.autorunSwap) .. "   free-cursor key " .. yn(ns.freeCursorHeld)
-    .. "   radial " .. yn(ns.RadialOpen and ns.RadialOpen(), "open", "closed"))
+    .. "   radial " .. yn(ns.RadialOpen and ns.RadialOpen(), "open", "closed") .. " (" .. how .. ")")
   return table.concat(out, "\n")
 end
 

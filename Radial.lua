@@ -252,6 +252,13 @@ local function buildFrames()
   end
 end
 
+function ns.RadialHoldBlocked()
+  local db = ns.db
+  if not (db and db.radial) then return false end
+  return (db.radial.mod or "shift") == "shift"
+    and ((db.shiftLeft or "") ~= "" or (db.shiftRight or "") ~= "")
+end
+
 function ns.RadialOpen()
   for _, r in ipairs(ringFrames) do
     if r:IsShown() then return true end
@@ -507,6 +514,11 @@ function ns.RebuildRadial()
   if clickMode and not (useSecure and openWrapped) then return end   -- needs snippets
   header:SetAttribute("ctpi-click", clickMode or nil)
   header:SetAttribute("state-radial", "0")
+  -- holding Shift for the ring would swallow every Shift-click (the ring
+  -- opens on the Shift press and takes the click), so with a Shift-click
+  -- action set, the hold-Shift ring stands down. Shift-click: Radial, or
+  -- Ctrl / Alt as the hold key, still open it.
+  if not clickMode and ns.RadialHoldBlocked() then return end
 
   local mod = MOD_COND[db.radial.mod or "shift"] or "mod:shift"
   local outer = db.radial.radius or 170
