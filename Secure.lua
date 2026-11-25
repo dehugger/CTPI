@@ -664,10 +664,15 @@ function ns.RemoveClickBindings()
   local db = ns.db
   setClick("BUTTON1", nil)
   setClick("BUTTON2", nil)
-  -- a Shift-click set to Free cursor stays bound while the cursor is free,
-  -- so a Shift-click in the world locks the camera again
+  -- a Shift-click set to Free cursor stays bound while YOU freed the cursor
+  -- with it (or the free-cursor key), so a Shift-click in the world locks
+  -- the camera again. freed for any other reason (away from the game, a
+  -- window, a popup) it's unbound, so the click that brings you back can't
+  -- flip the toggle.
   for path, key in pairs(SHIFT_KEYS) do
-    if not (db and db.enabled and db[path] == "FREECURSOR") then setClick(key, nil) end
+    if not (db and db.enabled and db[path] == "FREECURSOR" and ns.freeCursorHeld) then
+      setClick(key, nil)
+    end
   end
   if driverOn then headerSync(true, false) end
 end

@@ -103,7 +103,6 @@ ns.freeCursorHeld = false
 -- ---------------------------------------------------------------------
 local MANAGED_BK = 8
 local focusLost = false
-local lowSince = nil
 local inLoadingScreen = false
 local suppressUntil = 0
 
@@ -155,16 +154,21 @@ ns.RefreshFocusLimit = refreshLimit
 
 -- per-frame check, fed from the driver's OnUpdate. measures every frame's
 -- own duration instead of the game's 1-second fps average, so:
---   * focus counts as lost after ~half a second of
---     background-speed frames; one long frame (a hitch) never trips it
---   * it comes back only once frames are back to full speed AND you click
---     or press a movement key in the game window (so the mouse is never
---     re-grabbed while another app is in front)
-local slowFor, fastFor = 0, 0
+--   * focus counts as lost after ~half a second of background-speed
+--     frames, and at least two of them in a row: a Cmd-Tab freezes the
+--     game for about a second and then runs at the background cap, while
+--     one long hitch (a big pull, a loading stall) is a single frame and
+--     doesn't count
+--   * it comes back once frames are back to full speed AND you clicked or
+--     pressed a movement key in the game window since going away. the
+--     click that brings the window back usually lands before the frame
+--     rate recovers, so it's remembered rather than checked at that moment
+local slowFor, fastFor, slowFrames = 0, 0, 0
 local lostBy = nil
+local sawInput = false
 
 local function lostAway(why)
-  focusLost, lostBy, fastFor = true, why, 0
+  focusLost, lostBy, fastFor, sawInput = true, why, 0, false
   -- whether the game had already let go of the mouse on its own by now
   if ns.debug and ns.Log then
     ns.Log("focus", "away: " .. why .. " (mouselook still on: " .. tostring(IsMouselooking()) .. ")")
@@ -190,8 +194,8 @@ end
 local function feedFrame(elapsed)
   local db = ns.db
   if not (db and db.unlockOnFocusLoss) or inLoadingScreen or GetTime() < suppressUntil then
-    slowFor, fastFor = 0, 0
-    if focusLost then focusLost, lostBy = false, nil end
+    slowFor, fastFor, slowFrames = 0, 0, 0
+    if focusLost then focusLost, lostBy, sawInput = false, nil, false end
     return
   end
   if GetTime() - limitAt > 2 then refreshLimit() end
@@ -200,28 +204,31 @@ local function feedFrame(elapsed)
   -- mouselook in the middle of a macOS app switch left the cursor hidden for
   -- the whole desktop, so the only trigger is the frame rate again.)
 
+  if focusLost and not sawInput and playerIsHere() then sawInput = true end
+
   if elapsed >= frameLimit then
     fastFor = 0
     slowFor = slowFor + elapsed
-    if not focusLost and slowFor >= (db.focusDwell or 0.5) then
-      lostAway(string.format("%.2fs of frames slower than %d fps", slowFor, math.floor(1 / frameLimit + 0.5)))
+    slowFrames = slowFrames + 1
+    if not focusLost and slowFrames >= 2 and slowFor >= (db.focusDwell or 0.5) then
+      lostAway(string.format("%.2fs over %d frames slower than %d fps",
+        slowFor, slowFrames, math.floor(1 / frameLimit + 0.5)))
     end
   else
-    slowFor = 0
+    slowFor, slowFrames = 0, 0
     if focusLost then
       fastFor = fastFor + elapsed
       -- back at full speed AND you clicked or moved in the game window.
       -- frame rate alone isn't enough: re-grabbing the mouse while macOS
       -- still has another app in front is what made things go weird.
-      if fastFor >= 0.25 and playerIsHere() then
-        focusLost, lostBy, fastFor = false, nil, 0
+      if fastFor >= 0.25 and sawInput then
+        focusLost, lostBy, fastFor, sawInput = false, nil, 0, false
         if ns.debug then ns.Log("focus", "back (you clicked or moved)") end
         ns.ForceReconcile()
       end
     end
   end
 end
-local function updateFocusState() end   -- (kept for the loop; work happens per frame)
 -- for the debug window: current fps, the background threshold, how long
 -- frames have been slow, and whether focus counts as lost
 ns.FocusDebug = function()
@@ -590,7 +597,6 @@ driver:SetScript("OnUpdate", function(self, elapsed)
   if accum < (ns.db and ns.db.throttle or 0.05) then return end
   accum = 0
   if not ns.db then return end
-  updateFocusState()        -- heuristic window-focus check (cheap)
   local free, why = shouldFreeCursor()
   if free then
     if IsMouselooking() then disengage() end

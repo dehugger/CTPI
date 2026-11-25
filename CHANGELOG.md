@@ -39,7 +39,11 @@
   you're looking at nothing). It flips mid-combat along with the lock.
 - **Switching apps:** coming back no longer re-grabs the mouse on frame rate
   alone (it could grab it while another app was still in front). The camera
-  re-locks once you click or press a movement key in the game window.
+  re-locks once you click or press a movement key in the game window, and
+  the click that brings the window back counts (it used to be missed, so it
+  took a second click). One long hitch no longer counts as switching away
+  (it takes two slow frames in a row), so a big stall mid-fight can't free
+  the cursor.
 - **Shift-click and Shift-right-click actions** (Behavior tab, quick menu):
   each can be Default (your normal click with Shift held, which rogue
   Sap / Garrote rely on), Interact, Hold run, Autorun, Free cursor (same as
